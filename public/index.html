@@ -683,10 +683,12 @@ async function submitCase(e) {
     no_load_reasons,
     immediate_load,
     prosthetic_workflow,
-    maxillary_immediate_load:  hasMax  ? archState.maxillary.load  === 'yes' : null,
-    maxillary_prosthetic:      hasMax  ? archState.maxillary.prosthetic  || '' : '',
-    mandibular_immediate_load: hasMand ? archState.mandibular.load === 'yes' : null,
-    mandibular_prosthetic:     hasMand ? archState.mandibular.prosthetic || '' : '',
+    maxillary_immediate_load:      hasMax  ? archState.maxillary.load  === 'yes' : null,
+    maxillary_prosthetic:          hasMax  ? archState.maxillary.prosthetic  || '' : '',
+    maxillary_prosthetic_reason:   hasMax  ? (document.getElementById('arch-reason-maxillary')?.value.trim()  || '') : '',
+    mandibular_immediate_load:     hasMand ? archState.mandibular.load === 'yes' : null,
+    mandibular_prosthetic:         hasMand ? archState.mandibular.prosthetic || '' : '',
+    mandibular_prosthetic_reason:  hasMand ? (document.getElementById('arch-reason-mandibular')?.value.trim() || '') : '',
     favorite_learned:          document.getElementById('c-favorite').value.trim(),
     could_improve:             document.getElementById('c-improve').value.trim(),
   };
@@ -722,10 +724,8 @@ function toggleMonthYear() {
 // Arch Flowchart
 // ════════════════════════════════════════════════════════════════════════════
 const PROSTHETIC_OPTIONS = [
-  'AI design successful — immediately loaded',
-  'AI design successful — did not immediately load',
-  'Converted stock denture using SmartX',
-  'Delivered stock denture — did not immediately load',
+  'Successfully designed using AI and delivered',
+  'Attempted using AI but did not work',
 ];
 
 function updateArchSections() {
@@ -760,6 +760,10 @@ function updateArchSections() {
       container.querySelectorAll(`.arch-prosthetic-btn[data-arch="${arch}"]`).forEach(b => b.classList.remove('sel'));
       btn.classList.add('sel');
       archState[arch].prosthetic = btn.dataset.val;
+      const reasonWrap = document.getElementById(`arch-reason-wrap-${arch}`);
+      const failed = btn.dataset.val === 'Attempted using AI but did not work';
+      reasonWrap.classList.toggle('hidden', !failed);
+      if (!failed) document.getElementById(`arch-reason-${arch}`).value = '';
     });
   });
 
@@ -798,6 +802,10 @@ function buildArchSection(arch, label) {
           <label style="color:${hd}">Prosthetic / Digital Workflow — ${label}</label>
           <div class="choices">
             ${PROSTHETIC_OPTIONS.map(p => `<button type="button" class="choice arch-prosthetic-btn" data-arch="${arch}" data-val="${p}">${p}</button>`).join('')}
+          </div>
+          <div id="arch-reason-wrap-${arch}" class="hidden" style="margin-top:12px">
+            <label style="color:${hd}">Why didn't the AI design work?</label>
+            <textarea id="arch-reason-${arch}" placeholder="Describe what went wrong…" style="width:100%;padding:10px 12px;border:1.5px solid ${mid};border-radius:8px;font-size:15px;color:var(--g800);background:#fff;resize:vertical;min-height:80px;font-family:inherit;margin-top:4px"></textarea>
           </div>
         </div>
       </div>
@@ -967,9 +975,10 @@ function getCaseImmLoad(c) {
 
 function getCaseAiOk(c) {
   if (c.maxillary_immediate_load !== null || c.mandibular_immediate_load !== null) {
-    return (c.maxillary_prosthetic?.startsWith('AI design successful')  ? 1 : 0) +
-           (c.mandibular_prosthetic?.startsWith('AI design successful') ? 1 : 0);
+    return (c.maxillary_prosthetic  === 'Successfully designed using AI and delivered' ? 1 : 0) +
+           (c.mandibular_prosthetic === 'Successfully designed using AI and delivered' ? 1 : 0);
   }
+  // Old-format fallback
   const pw = c.prosthetic_workflow || [];
   const p  = c.procedures || [];
   if (!pw.some(v => v.startsWith('AI design successful'))) return 0;
@@ -999,8 +1008,10 @@ function computeOverallStats(cases) {
     (c.no_load_reasons || []).forEach(r => noLoadCounts[r] = (noLoadCounts[r]||0)+1);
 
     const pw = c.prosthetic_workflow || [];
-    if (pw.includes('Tried AI and it did not work')) aiFail++;
-    if (pw.includes('Delivered stock denture'))       stock++;
+    if (pw.includes('Attempted using AI but did not work') || pw.includes('Tried AI and it did not work')) aiFail++;
+    if (pw.includes('Delivered stock denture')) stock++;
+    if (c.maxillary_prosthetic  === 'Attempted using AI but did not work') aiFail++;
+    if (c.mandibular_prosthetic === 'Attempted using AI but did not work') aiFail++;
 
     dateMap[c.date] = (dateMap[c.date]||0) + 1;
   });
