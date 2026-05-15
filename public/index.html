@@ -841,7 +841,7 @@ function computeOverallStats(cases) {
     (c.no_load_reasons || []).forEach(r => noLoadCounts[r] = (noLoadCounts[r]||0)+1);
 
     const pw = c.prosthetic_workflow || [];
-    if (pw.includes('Used AI to successfully design temporary prosthesis')) aiOk++;
+    if (pw.some(v => v.startsWith('AI design successful'))) aiOk++;
     if (pw.includes('Tried AI and it did not work'))                         aiFail++;
     if (pw.includes('Delivered stock denture'))                              stock++;
 
@@ -985,7 +985,7 @@ function renderStudentTable() {
       if (c.immediate_load==='maxillary') immLoad+=1;
       else if (c.immediate_load==='mandibular') immLoad+=1;
       else if (c.immediate_load==='both') immLoad+=2;
-      if ((c.prosthetic_workflow||[]).includes('Used AI to successfully design temporary prosthesis')) aiOk++;
+      if ((c.prosthetic_workflow||[]).some(v => v.startsWith('AI design successful'))) aiOk++;
     });
     return { s, cases:sc.length, maxArch, mandArch, implants, immLoad, ridge, vSinus, lSinus, aiOk };
   }).sort((a,b)=>a.s.name.localeCompare(b.s.name));
