@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Level 3 Implant Tracker</title>
+<title>Live Implant Training — Case Tracker</title>
 <style>
 /* ── Reset & Variables ──────────────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -195,8 +195,8 @@ th.num{text-align:right}
   <div class="header-inner">
     <span class="header-icon">🦷</span>
     <div>
-      <div class="header-title">Implant Case Tracker</div>
-      <div class="header-sub">Level 3 Live Training</div>
+      <div class="header-title">Live Implant Training</div>
+      <div class="header-sub">Implant Case Tracker</div>
     </div>
   </div>
 </header>
@@ -278,6 +278,38 @@ th.num{text-align:right}
       <div class="hint" id="student-hint"></div>
     </div>
 
+    <!-- Location -->
+    <div class="field">
+      <label>Course Location</label>
+      <select id="c-location" required onchange="toggleMonthYear()">
+        <option value="">Select location…</option>
+        <option value="Valparaiso, Mexico">Valparaiso, Mexico</option>
+        <option value="Bogotá, Colombia">Bogotá, Colombia</option>
+        <option value="Guadalajara, Mexico">Guadalajara, Mexico</option>
+      </select>
+    </div>
+
+    <!-- Month + Year (shown after location selected) -->
+    <div class="row hidden" id="monthyear-section">
+      <div class="field">
+        <label>Course Month</label>
+        <select id="c-month" required>
+          <option value="">Month…</option>
+          <option>January</option><option>February</option><option>March</option>
+          <option>April</option><option>May</option><option>June</option>
+          <option>July</option><option>August</option><option>September</option>
+          <option>October</option><option>November</option><option>December</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Course Year</label>
+        <select id="c-year" required>
+          <option value="">Year…</option>
+          <option>2026</option><option>2027</option><option>2028</option>
+        </select>
+      </div>
+    </div>
+
     <!-- Date -->
     <div class="field">
       <label>Date</label>
@@ -288,11 +320,12 @@ th.num{text-align:right}
     <div class="field">
       <label>Procedures Performed</label>
       <div class="pills" id="pills-procedures">
-        <div class="pill" data-val="Maxillary full arch">Maxillary full arch</div>
-        <div class="pill" data-val="Mandibular full arch">Mandibular full arch</div>
-        <div class="pill" data-val="Ridge augmentation">Ridge augmentation</div>
-        <div class="pill" data-val="Vertical sinus lift">Vertical sinus lift</div>
-        <div class="pill" data-val="Lateral sinus lift">Lateral sinus lift</div>
+        <div class="pill" data-val="Maxillary AOX">Maxillary AOX</div>
+        <div class="pill" data-val="Mandibular AOX">Mandibular AOX</div>
+        <div class="pill" data-val="Maxillary Ridge Augmentation">Maxillary Ridge Augmentation</div>
+        <div class="pill" data-val="Mandibular Ridge Augmentation">Mandibular Ridge Augmentation</div>
+        <div class="pill" data-val="Unilateral Sinus Lift">Unilateral Sinus Lift</div>
+        <div class="pill" data-val="Bilateral Sinus Lift">Bilateral Sinus Lift</div>
       </div>
     </div>
 
@@ -393,12 +426,12 @@ th.num{text-align:right}
             <th class="num">Cases</th>
             <th>Immediate Load</th>
             <th>AI Prosthesis</th>
-            <th class="num">Maxillary Arch</th>
-            <th class="num">Mandibular Arch</th>
+            <th class="num">Maxillary AOX</th>
+            <th class="num">Mandibular AOX</th>
             <th class="num">Implants</th>
-            <th class="num">Ridge Augmentation</th>
-            <th class="num">Vertical Sinus Lift</th>
-            <th class="num">Lateral Sinus Lift</th>
+            <th class="num">Ridge Aug</th>
+            <th class="num">Unilateral Sinus</th>
+            <th class="num">Bilateral Sinus</th>
           </tr>
         </thead>
         <tbody id="student-table-body"></tbody>
@@ -570,9 +603,18 @@ async function submitCase(e) {
 
   const no_load_reasons = load === 'no' ? getSelectedPills('pills-noload') : [];
 
+  const location   = document.getElementById('c-location').value;
+  const month      = document.getElementById('c-month').value;
+  const year       = document.getElementById('c-year').value;
+  if (!location) { toast('Please select a course location', 'error'); return; }
+  if (!month || !year) { toast('Please select the course month and year', 'error'); return; }
+
   const payload = {
     student_name,
     date:                    document.getElementById('c-date').value,
+    location,
+    course_month:            month,
+    course_year:             year,
     procedures,
     num_implants:            parseInt(document.getElementById('c-implants').value) || 0,
     immediate_placement_teeth: document.getElementById('c-imm-teeth').value.trim(),
@@ -603,7 +645,13 @@ function resetCaseForm() {
   document.querySelectorAll('#choices-load .choice').forEach(b => b.classList.remove('sel'));
   document.querySelectorAll('#choices-prosthetic .choice').forEach(b => b.classList.remove('sel'));
   document.getElementById('noload-section').classList.add('hidden');
+  document.getElementById('monthyear-section').classList.add('hidden');
   document.getElementById('c-implants').value = 0;
+}
+
+function toggleMonthYear() {
+  const loc = document.getElementById('c-location').value;
+  document.getElementById('monthyear-section').classList.toggle('hidden', !loc);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -709,11 +757,12 @@ function computeOverallStats(cases) {
 
   cases.forEach(c => {
     const procs = c.procedures || [];
-    if (procs.includes('Maxillary full arch')) maxillary++;
-    if (procs.includes('Mandibular full arch')) mandibular++;
-    if (procs.includes('Ridge augmentation')) ridge++;
-    if (procs.includes('Vertical sinus lift')) vSinus++;
-    if (procs.includes('Lateral sinus lift')) lSinus++;
+    if (procs.includes('Maxillary AOX')) maxillary++;
+    if (procs.includes('Mandibular AOX')) mandibular++;
+    if (procs.includes('Maxillary Ridge Augmentation')) ridge++;
+    if (procs.includes('Mandibular Ridge Augmentation')) ridge++;
+    if (procs.includes('Unilateral Sinus Lift')) vSinus++;
+    if (procs.includes('Bilateral Sinus Lift')) lSinus++;
 
     implants    += c.num_implants    || 0;
     extractions += c.num_extractions || 0;
@@ -755,9 +804,9 @@ function renderOverallStats(s) {
     { val: s.extractions, label: 'Extractions',           color: '#0891b2' },
     { val: s.immLoad,     label: 'Immediately Loaded Arches', color: '#059669' },
     { val: s.ilPct + (s.ilPct !== '—' ? '%' : ''), label: 'Immediate Load Rate', color: '#10b981', sub: 'by arch count' },
-    { val: s.ridge,       label: 'Ridge Augmentations',  color: '#d97706' },
-    { val: s.vSinus,      label: 'Vertical Sinus Lifts', color: '#b45309' },
-    { val: s.lSinus,      label: 'Lateral Sinus Lifts',  color: '#92400e' },
+    { val: s.ridge,       label: 'Ridge Augmentations',   color: '#d97706' },
+    { val: s.vSinus,      label: 'Unilateral Sinus Lifts', color: '#b45309' },
+    { val: s.lSinus,      label: 'Bilateral Sinus Lifts',  color: '#92400e' },
     { val: s.aiOk,        label: 'AI Prosthesis Successes', color: '#059669' },
     { val: s.aiFail,      label: 'AI Attempts Failed',   color: '#dc2626' },
     { val: s.aiPct,       label: 'AI Success Rate',      color: '#7c3aed' },
@@ -859,11 +908,12 @@ function renderStudentTable() {
     let maxArch=0, mandArch=0, implants=0, immLoad=0, ridge=0, vSinus=0, lSinus=0, aiOk=0;
     sc.forEach(c => {
       const p = c.procedures||[];
-      if (p.includes('Maxillary full arch')) maxArch++;
-      if (p.includes('Mandibular full arch')) mandArch++;
-      if (p.includes('Ridge augmentation')) ridge++;
-      if (p.includes('Vertical sinus lift')) vSinus++;
-      if (p.includes('Lateral sinus lift')) lSinus++;
+      if (p.includes('Maxillary AOX')) maxArch++;
+      if (p.includes('Mandibular AOX')) mandArch++;
+      if (p.includes('Maxillary Ridge Augmentation')) ridge++;
+      if (p.includes('Mandibular Ridge Augmentation')) ridge++;
+      if (p.includes('Unilateral Sinus Lift')) vSinus++;
+      if (p.includes('Bilateral Sinus Lift')) lSinus++;
       implants += c.num_implants||0;
       if (c.immediate_load==='maxillary') immLoad+=1;
       else if (c.immediate_load==='mandibular') immLoad+=1;
