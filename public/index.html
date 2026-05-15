@@ -199,6 +199,16 @@ th.num{text-align:right}
 .cmp-label{font-size:11px;color:var(--g500);margin-top:2px}
 .cmp-bar-wrap{margin-top:8px}
 .student-select-hint{font-size:13px;color:var(--g500);padding:12px;background:var(--warn-lt);border-radius:var(--radius-sm);border:1px solid #fde68a}
+
+/* ── Reflections ────────────────────────────────────────────────────────── */
+.reflections-grid{display:grid;grid-template-columns:1fr;gap:16px}
+@media(min-width:640px){.reflections-grid{grid-template-columns:1fr 1fr}}
+.reflections-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:20px}
+.reflections-card-title{font-size:14px;font-weight:700;color:var(--g700);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.anon-badge{font-size:11px;font-weight:600;background:var(--success-lt);color:var(--success);padding:2px 8px;border-radius:100px}
+.reflection-item{padding:10px 0;border-bottom:1px solid var(--g100);font-size:14px;color:var(--g700);line-height:1.5}
+.reflection-item:last-child{border-bottom:none}
+.reflection-empty{color:var(--g400);font-size:13px;font-style:italic}
 </style>
 </head>
 <body>
@@ -392,12 +402,12 @@ th.num{text-align:right}
 
     <!-- Reflections -->
     <div class="field">
-      <label>What was your favorite thing you learned today?</label>
+      <label>What was your favorite thing you learned today? <span style="font-weight:400;text-transform:none;color:var(--success);font-size:11px">— Anonymous</span></label>
       <textarea id="c-favorite" placeholder="Share what stood out most to you…" required></textarea>
     </div>
 
     <div class="field">
-      <label>What could have been improved today?</label>
+      <label>What could have been improved today? <span style="font-weight:400;text-transform:none;color:var(--success);font-size:11px">— Anonymous</span></label>
       <textarea id="c-improve" placeholder="Any areas for growth or suggestions…" required></textarea>
     </div>
 
@@ -461,6 +471,10 @@ th.num{text-align:right}
   <!-- Pre-Course Experience -->
   <div class="dash-section-title">Pre-Course Experience</div>
   <div id="precourse-stats-block"></div>
+
+  <!-- Anonymous Reflections -->
+  <div class="dash-section-title">Anonymous Reflections</div>
+  <div class="reflections-grid" id="reflections-block"></div>
 
 
 </section>
@@ -774,7 +788,33 @@ function renderDashboard() {
   renderOverallStats(stats);
   renderPreCourseStats();
   renderStudentTable();
-  renderCasesList();
+  renderReflections();
+}
+
+function renderReflections() {
+  const favorites = filteredCases.map(c => c.favorite_learned).filter(Boolean);
+  const improvements = filteredCases.map(c => c.could_improve).filter(Boolean);
+
+  const listHTML = (items, emptyMsg) => items.length
+    ? items.map(t => `<div class="reflection-item">${esc(t)}</div>`).join('')
+    : `<div class="reflection-empty">${emptyMsg}</div>`;
+
+  document.getElementById('reflections-block').innerHTML = `
+    <div class="reflections-card">
+      <div class="reflections-card-title">
+        ⭐ Favorite things learned
+        <span class="anon-badge">Anonymous</span>
+      </div>
+      ${listHTML(favorites, 'No responses yet.')}
+    </div>
+    <div class="reflections-card">
+      <div class="reflections-card-title">
+        💡 What could be improved
+        <span class="anon-badge">Anonymous</span>
+      </div>
+      ${listHTML(improvements, 'No responses yet.')}
+    </div>
+  `;
 }
 
 function computeOverallStats(cases) {
