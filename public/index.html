@@ -415,7 +415,30 @@ th.num{text-align:right}
 ════════════════════════════════════════════════════════════════════════════ -->
 <section id="tab-dashboard" class="tab-section">
 
-  <!-- Filters -->
+  <!-- Country filter -->
+  <div class="week-bar" id="country-bar">
+    <span class="week-bar-label">Country:</span>
+    <button class="day-btn filter-pill-btn active" onclick="setCountryFilter('', this)">All</button>
+    <button class="day-btn filter-pill-btn" onclick="setCountryFilter('Valparaiso, Mexico', this)">Valparaiso, Mexico</button>
+    <button class="day-btn filter-pill-btn" onclick="setCountryFilter('Bogotá, Colombia', this)">Bogotá, Colombia</button>
+    <button class="day-btn filter-pill-btn" onclick="setCountryFilter('Guadalajara, Mexico', this)">Guadalajara, Mexico</button>
+  </div>
+
+  <!-- Course date filter (populated from data) -->
+  <div class="week-bar">
+    <span class="week-bar-label">Course:</span>
+    <div id="course-date-btns" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+    <button class="day-btn" onclick="clearCourseFilter()" style="margin-left:4px">All courses</button>
+  </div>
+
+  <!-- Week quick filter (day-level) -->
+  <div class="week-bar">
+    <span class="week-bar-label">This week:</span>
+    <div id="week-day-btns" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+    <button class="day-btn" onclick="clearFilters()" style="margin-left:4px">All dates</button>
+  </div>
+
+  <!-- Student filter + hidden date inputs used by week bar -->
   <div class="filter-bar">
     <div class="field">
       <label>Filter by Student</label>
@@ -423,22 +446,9 @@ th.num{text-align:right}
         <option value="">All Students</option>
       </select>
     </div>
-    <div class="field">
-      <label>Start Date</label>
-      <input type="date" id="f-start" onchange="applyFilters()">
-    </div>
-    <div class="field">
-      <label>End Date</label>
-      <input type="date" id="f-end" onchange="applyFilters()">
-    </div>
-    <button class="btn btn-outline btn-sm" onclick="clearFilters()">Clear</button>
-  </div>
-
-  <!-- Week quick filter -->
-  <div class="week-bar">
-    <span class="week-bar-label">This week:</span>
-    <div id="week-day-btns" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-    <button class="day-btn" onclick="clearFilters()" style="margin-left:4px">All dates</button>
+    <input type="date" id="f-start" class="hidden">
+    <input type="date" id="f-end" class="hidden">
+    <button class="btn btn-outline btn-sm" onclick="clearFilters()">Clear All</button>
   </div>
 
   <!-- Student Breakdown Table -->
@@ -509,6 +519,8 @@ th.num{text-align:right}
 let allStudents = [];
 let allCases    = [];
 let filteredCases = [];
+let filterCountry = '';
+let filterCourse  = '';
 let archState = {
   maxillary:  { load: null, prosthetic: null },
   mandibular: { load: null, prosthetic: null },
@@ -564,6 +576,7 @@ const store = {
 
 async function loadAndRender() {
   [allStudents, allCases] = await Promise.all([store.getStudents(), store.getCases()]);
+  buildCourseDateBar();
   applyFilters();
   populateDashboardStudentFilter();
 }
@@ -867,14 +880,16 @@ function populateDashboardStudentFilter() {
 }
 
 function applyFilters() {
-  const student = document.getElementById('f-student')?.value || '';
-  const startDate = document.getElementById('f-start')?.value || '';
-  const endDate   = document.getElementById('f-end')?.value || '';
+  const student   = document.getElementById('f-student')?.value || '';
+  const startDate = document.getElementById('f-start')?.value  || '';
+  const endDate   = document.getElementById('f-end')?.value    || '';
 
   filteredCases = allCases.filter(c => {
-    if (student && c.student_name !== student) return false;
-    if (startDate && c.date < startDate) return false;
-    if (endDate   && c.date > endDate)   return false;
+    if (student       && c.student_name !== student)                           return false;
+    if (startDate     && c.date < startDate)                                   return false;
+    if (endDate       && c.date > endDate)                                     return false;
+    if (filterCountry && c.location !== filterCountry)                         return false;
+    if (filterCourse  && `${c.course_month} ${c.course_year}` !== filterCourse) return false;
     return true;
   });
 
@@ -883,10 +898,52 @@ function applyFilters() {
 
 function clearFilters() {
   document.getElementById('f-student').value = '';
-  document.getElementById('f-start').value = '';
-  document.getElementById('f-end').value = '';
+  document.getElementById('f-start').value   = '';
+  document.getElementById('f-end').value     = '';
+  filterCountry = '';
+  filterCourse  = '';
   document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#country-bar .filter-pill-btn').forEach((b, i) => { if (i === 0) b.classList.add('active'); });
   applyFilters();
+}
+
+function setCountryFilter(country, btn) {
+  filterCountry = country;
+  document.querySelectorAll('#country-bar .filter-pill-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+function setCourseFilter(course, btn) {
+  filterCourse = course;
+  document.querySelectorAll('#course-date-btns .filter-pill-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+function clearCourseFilter() {
+  filterCourse = '';
+  document.querySelectorAll('#course-date-btns .filter-pill-btn').forEach(b => b.classList.remove('active'));
+  applyFilters();
+}
+
+function buildCourseDateBar() {
+  const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const seen = new Set();
+  allCases.forEach(c => { if (c.course_month && c.course_year) seen.add(`${c.course_month} ${c.course_year}`); });
+  const courses = [...seen].sort((a, b) => {
+    const [am, ay] = a.split(' '), [bm, by] = b.split(' ');
+    return ay !== by ? Number(ay) - Number(by) : MONTH_ORDER.indexOf(am) - MONTH_ORDER.indexOf(bm);
+  });
+  const container = document.getElementById('course-date-btns');
+  container.innerHTML = '';
+  courses.forEach(key => {
+    const btn = document.createElement('button');
+    btn.className = 'day-btn filter-pill-btn' + (filterCourse === key ? ' active' : '');
+    btn.textContent = key;
+    btn.onclick = () => setCourseFilter(key, btn);
+    container.appendChild(btn);
+  });
 }
 
 function buildWeekBar() {
@@ -1017,7 +1074,7 @@ function computeOverallStats(cases) {
   });
 
   const totalArches = maxillary + mandibular;
-  const ilPct = totalArches > 0 ? ((immLoad / totalArches)*100).toFixed(1) : '—';
+  const ilPct = totalArches > 0 ? Math.min(100, (immLoad / totalArches)*100).toFixed(1) : '—';
   const aiPct = (aiOk+aiFail) > 0 ? ((aiOk/(aiOk+aiFail))*100).toFixed(1)+'%' : '—';
 
   return {
