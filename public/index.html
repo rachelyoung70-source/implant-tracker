@@ -363,8 +363,7 @@ th.num{text-align:right}
         <div class="pill" data-val="Mandibular AOX">Mandibular AOX</div>
         <div class="pill" data-val="Maxillary Ridge Augmentation">Maxillary Ridge Augmentation</div>
         <div class="pill" data-val="Mandibular Ridge Augmentation">Mandibular Ridge Augmentation</div>
-        <div class="pill" data-val="Unilateral Sinus Lift">Unilateral Sinus Lift</div>
-        <div class="pill" data-val="Bilateral Sinus Lift">Bilateral Sinus Lift</div>
+        <div class="pill" data-val="Sinus Lift">Sinus Lift</div>
       </div>
     </div>
 
@@ -378,6 +377,15 @@ th.num{text-align:right}
       <label>Tooth Numbers With Immediate Placement</label>
       <input type="text" id="c-imm-teeth" placeholder="e.g. #3, #14, #19 — or write None" required>
       <div class="hint">Implants placed into fresh extraction sockets. Write None if not applicable.</div>
+    </div>
+
+    <!-- Sinus lift type (shown when Sinus Lift pill is selected) -->
+    <div class="field hidden" id="sinus-type-section">
+      <label>Sinus Lift Type</label>
+      <div class="choices" id="choices-sinus">
+        <button type="button" class="choice" data-val="unilateral">Unilateral — 1 sinus</button>
+        <button type="button" class="choice" data-val="bilateral">Bilateral — 2 sinuses</button>
+      </div>
     </div>
 
     <!-- Per-arch flowchart sections (rendered by JS when AOX arches are selected) -->
@@ -467,8 +475,7 @@ th.num{text-align:right}
             <th class="num">Mandibular AOX</th>
             <th class="num">Implants</th>
             <th class="num">Ridge Aug</th>
-            <th class="num">Unilateral Sinus</th>
-            <th class="num">Bilateral Sinus</th>
+            <th class="num">Sinus Lifts</th>
           </tr>
         </thead>
         <tbody id="student-table-body"></tbody>
@@ -521,6 +528,7 @@ let allCases    = [];
 let filteredCases = [];
 let filterCountry = '';
 let filterCourse  = '';
+let sinusType = null;
 let archState = {
   maxillary:  { load: null, prosthetic: null },
   mandibular: { load: null, prosthetic: null },
@@ -661,8 +669,16 @@ async function submitCase(e) {
   const procedures = getSelectedPills('pills-procedures');
   if (!procedures.length) { toast('Please select at least one procedure', 'error'); return; }
 
-  const hasMax  = procedures.includes('Maxillary AOX');
-  const hasMand = procedures.includes('Mandibular AOX');
+  const hasMax   = procedures.includes('Maxillary AOX');
+  const hasMand  = procedures.includes('Mandibular AOX');
+  const hasSinus = procedures.includes('Sinus Lift');
+
+  if (hasSinus && !sinusType) { toast('Please select Unilateral or Bilateral for the Sinus Lift', 'error'); return; }
+
+  // Replace "Sinus Lift" pill with the specific type before submitting
+  const finalProcedures = procedures.map(p =>
+    p === 'Sinus Lift' ? (sinusType === 'bilateral' ? 'Bilateral Sinus Lift' : 'Unilateral Sinus Lift') : p
+  );
 
   if (hasMax  && archState.maxillary.load  === null) { toast('Please answer the Maxillary arch loading question', 'error'); return; }
   if (hasMand && archState.mandibular.load === null) { toast('Please answer the Mandibular arch loading question', 'error'); return; }
@@ -690,7 +706,7 @@ async function submitCase(e) {
     location,
     course_month:              month,
     course_year:               year,
-    procedures,
+    procedures: finalProcedures,
     num_implants:              parseInt(document.getElementById('c-implants').value) || 0,
     immediate_placement_teeth: document.getElementById('c-imm-teeth').value.trim(),
     no_load_reasons,
@@ -721,6 +737,9 @@ function resetCaseForm() {
   setDefaultDate();
   clearPills('pills-procedures');
   clearPills('pills-noload');
+  sinusType = null;
+  document.querySelectorAll('#choices-sinus .choice').forEach(b => b.classList.remove('sel'));
+  document.getElementById('sinus-type-section').classList.add('hidden');
   archState = { maxillary: { load: null, prosthetic: null }, mandibular: { load: null, prosthetic: null } };
   document.getElementById('arch-sections').innerHTML = '';
   document.getElementById('noload-section').classList.add('hidden');
@@ -742,9 +761,17 @@ const PROSTHETIC_OPTIONS = [
 ];
 
 function updateArchSections() {
-  const procs   = getSelectedPills('pills-procedures');
-  const hasMax  = procs.includes('Maxillary AOX');
-  const hasMand = procs.includes('Mandibular AOX');
+  const procs    = getSelectedPills('pills-procedures');
+  const hasMax   = procs.includes('Maxillary AOX');
+  const hasMand  = procs.includes('Mandibular AOX');
+  const hasSinus = procs.includes('Sinus Lift');
+
+  // Show/hide sinus type question
+  document.getElementById('sinus-type-section').classList.toggle('hidden', !hasSinus);
+  if (!hasSinus) {
+    sinusType = null;
+    document.querySelectorAll('#choices-sinus .choice').forEach(b => b.classList.remove('sel'));
+  }
 
   if (!hasMax)  archState.maxillary  = { load: null, prosthetic: null };
   if (!hasMand) archState.mandibular = { load: null, prosthetic: null };
@@ -839,13 +866,22 @@ function updateNoloadSection() {
 // Pills & Choices
 // ════════════════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-  // Wire multi-select pill containers; procedure pills also trigger arch sections
+  // Wire multi-select pill containers; procedure pills also trigger arch/sinus sections
   document.querySelectorAll('.pills').forEach(container => {
     container.addEventListener('click', e => {
       const pill = e.target.closest('.pill');
       if (!pill) return;
       pill.classList.toggle('sel');
       if (container.id === 'pills-procedures') updateArchSections();
+    });
+  });
+
+  // Wire sinus lift type choices
+  document.querySelectorAll('#choices-sinus .choice').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#choices-sinus .choice').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      sinusType = btn.dataset.val;
     });
   });
 
@@ -1044,7 +1080,7 @@ function getCaseAiOk(c) {
 
 function computeOverallStats(cases) {
   let maxillary=0, mandibular=0, implants=0, extractions=0, immLoad=0;
-  let ridge=0, vSinus=0, lSinus=0, aiOk=0, aiFail=0, stock=0;
+  let ridge=0, sinus=0, aiOk=0, aiFail=0, stock=0;
   const noLoadCounts = {}, dateMap = {};
 
   cases.forEach(c => {
@@ -1053,8 +1089,8 @@ function computeOverallStats(cases) {
     if (procs.includes('Mandibular AOX')) mandibular++;
     if (procs.includes('Maxillary Ridge Augmentation')) ridge++;
     if (procs.includes('Mandibular Ridge Augmentation')) ridge++;
-    if (procs.includes('Unilateral Sinus Lift')) vSinus++;
-    if (procs.includes('Bilateral Sinus Lift')) lSinus++;
+    if (procs.includes('Unilateral Sinus Lift')) sinus += 1;
+    if (procs.includes('Bilateral Sinus Lift'))  sinus += 2;
 
     implants    += c.num_implants    || 0;
     extractions += c.num_extractions || 0;
@@ -1080,7 +1116,7 @@ function computeOverallStats(cases) {
   return {
     totalCases: cases.length, totalArches, maxillary, mandibular,
     implants, extractions, immLoad, ilPct,
-    ridge, vSinus, lSinus,
+    ridge, sinus,
     aiOk, aiFail, aiPct, stock,
     noLoadCounts, dateMap,
   };
@@ -1097,8 +1133,7 @@ function renderOverallStats(s) {
     { val: s.immLoad,     label: 'Immediately Loaded Arches', color: '#059669' },
     { val: s.ilPct + (s.ilPct !== '—' ? '%' : ''), label: 'Immediate Load Rate', color: '#10b981', sub: 'by arch count' },
     { val: s.ridge,       label: 'Ridge Augmentations',   color: '#d97706' },
-    { val: s.vSinus,      label: 'Unilateral Sinus Lifts', color: '#b45309' },
-    { val: s.lSinus,      label: 'Bilateral Sinus Lifts',  color: '#92400e' },
+    { val: s.sinus,       label: 'Sinus Lift Procedures',  color: '#b45309' },
     { val: s.aiOk,        label: 'AI Prosthesis Successes', color: '#059669' },
     { val: s.aiFail,      label: 'AI Attempts Failed',   color: '#dc2626' },
     { val: s.aiPct,       label: 'AI Success Rate',      color: '#7c3aed' },
@@ -1190,27 +1225,27 @@ function renderStudentTable() {
   const displayStudents = [...allStudents, ...caseOnlyNames];
 
   if (!displayStudents.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--g400)">No students or cases yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--g400)">No students or cases yet.</td></tr>';
     summary.innerHTML = '';
     return;
   }
 
   const rows = displayStudents.map(s => {
     const sc = filteredCases.filter(c => c.student_name === s.name);
-    let maxArch=0, mandArch=0, implants=0, immLoad=0, ridge=0, vSinus=0, lSinus=0, aiOk=0;
+    let maxArch=0, mandArch=0, implants=0, immLoad=0, ridge=0, sinus=0, aiOk=0;
     sc.forEach(c => {
       const p = c.procedures||[];
       if (p.includes('Maxillary AOX')) maxArch++;
       if (p.includes('Mandibular AOX')) mandArch++;
       if (p.includes('Maxillary Ridge Augmentation')) ridge++;
       if (p.includes('Mandibular Ridge Augmentation')) ridge++;
-      if (p.includes('Unilateral Sinus Lift')) vSinus++;
-      if (p.includes('Bilateral Sinus Lift')) lSinus++;
+      if (p.includes('Unilateral Sinus Lift')) sinus += 1;
+      if (p.includes('Bilateral Sinus Lift'))  sinus += 2;
       implants += c.num_implants||0;
       immLoad  += getCaseImmLoad(c);
       aiOk     += getCaseAiOk(c);
     });
-    return { s, cases:sc.length, maxArch, mandArch, implants, immLoad, ridge, vSinus, lSinus, aiOk };
+    return { s, cases:sc.length, maxArch, mandArch, implants, immLoad, ridge, sinus, aiOk };
   }).sort((a,b)=>a.s.name.localeCompare(b.s.name));
 
   // Summary chips
@@ -1251,8 +1286,7 @@ function renderStudentTable() {
       <td class="td-num">${r.mandArch}</td>
       <td class="td-num">${r.implants}</td>
       <td class="td-num">${r.ridge}</td>
-      <td class="td-num">${r.vSinus}</td>
-      <td class="td-num">${r.lSinus}</td>
+      <td class="td-num">${r.sinus}</td>
     </tr>
   `).join('');
 }
