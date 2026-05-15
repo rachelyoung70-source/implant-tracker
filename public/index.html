@@ -217,6 +217,12 @@ th.num{text-align:right}
 .reflection-item{padding:10px 0;border-bottom:1px solid var(--g100);font-size:14px;color:var(--g700);line-height:1.5}
 .reflection-item:last-child{border-bottom:none}
 .reflection-empty{color:var(--g400);font-size:13px;font-style:italic}
+
+/* ── Arch flowchart cards ───────────────────────────────────────────────── */
+.arch-card{border-radius:var(--radius);overflow:hidden;margin-bottom:16px;box-shadow:var(--shadow-md)}
+.arch-card-hd{padding:12px 16px;color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.arch-card-body{padding:16px}
+.arch-card .field:last-child{margin-bottom:0}
 </style>
 </head>
 <body>
@@ -374,18 +380,10 @@ th.num{text-align:right}
       <div class="hint">Implants placed into fresh extraction sockets. Write None if not applicable.</div>
     </div>
 
-    <!-- Immediate Load -->
-    <div class="field">
-      <label>Did You Immediately Load?</label>
-      <div class="choices" id="choices-load">
-        <button type="button" class="choice" data-val="maxillary">Yes — Maxillary</button>
-        <button type="button" class="choice" data-val="mandibular">Yes — Mandibular</button>
-        <button type="button" class="choice" data-val="both">Yes — Both arches</button>
-        <button type="button" class="choice" data-val="no">No</button>
-      </div>
-    </div>
+    <!-- Per-arch flowchart sections (rendered by JS when AOX arches are selected) -->
+    <div id="arch-sections"></div>
 
-    <!-- Conditional: No-load reasons -->
+    <!-- No-load reasons (shown when any selected arch was not loaded) -->
     <div class="field hidden" id="noload-section">
       <label>Why Was the Arch Not Immediately Loaded?</label>
       <div class="pills" id="pills-noload">
@@ -394,17 +392,6 @@ th.num{text-align:right}
         <div class="pill" data-val="Lateral sinus lift performed">Lateral sinus lift performed</div>
         <div class="pill" data-val="Extensive bone grafting/ridge augmentation">Extensive bone grafting / ridge augmentation</div>
         <div class="pill" data-val="Other">Other</div>
-      </div>
-    </div>
-
-    <!-- Prosthetic Workflow -->
-    <div class="field">
-      <label>Prosthetic / Digital Workflow</label>
-      <div class="choices" id="choices-prosthetic">
-        <button type="button" class="choice" data-val="AI design successful — immediately loaded">AI design successful — immediately loaded</button>
-        <button type="button" class="choice" data-val="AI design successful — did not immediately load">AI design successful — did not immediately load</button>
-        <button type="button" class="choice" data-val="Converted stock denture using SmartX">Converted stock denture using SmartX</button>
-        <button type="button" class="choice" data-val="Delivered stock denture — did not immediately load">Delivered stock denture — did not immediately load</button>
       </div>
     </div>
 
@@ -522,8 +509,10 @@ th.num{text-align:right}
 let allStudents = [];
 let allCases    = [];
 let filteredCases = [];
-let selectedLoad = null;
-let selectedProsthetic = null;
+let archState = {
+  maxillary:  { load: null, prosthetic: null },
+  mandibular: { load: null, prosthetic: null },
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 // Navigation
@@ -650,36 +639,56 @@ async function submitCase(e) {
   const student_name = document.getElementById('c-student').value.trim();
   if (!student_name) { toast('Please enter your name', 'error'); return; }
 
+  const location = document.getElementById('c-location').value;
+  const month    = document.getElementById('c-month').value;
+  const year     = document.getElementById('c-year').value;
+  if (!location)       { toast('Please select a course location', 'error'); return; }
+  if (!month || !year) { toast('Please select the course month and year', 'error'); return; }
+
   const procedures = getSelectedPills('pills-procedures');
   if (!procedures.length) { toast('Please select at least one procedure', 'error'); return; }
 
-  const load = selectedLoad;
-  if (!load) { toast('Please select an immediate load option', 'error'); return; }
+  const hasMax  = procedures.includes('Maxillary AOX');
+  const hasMand = procedures.includes('Mandibular AOX');
 
-  if (!selectedProsthetic) { toast('Please select a prosthetic workflow option', 'error'); return; }
+  if (hasMax  && archState.maxillary.load  === null) { toast('Please answer the Maxillary arch loading question', 'error'); return; }
+  if (hasMand && archState.mandibular.load === null) { toast('Please answer the Mandibular arch loading question', 'error'); return; }
+  if (hasMax  && !archState.maxillary.prosthetic)    { toast('Please select a prosthetic workflow for the Maxillary arch', 'error'); return; }
+  if (hasMand && !archState.mandibular.prosthetic)   { toast('Please select a prosthetic workflow for the Mandibular arch', 'error'); return; }
 
-  const no_load_reasons = load === 'no' ? getSelectedPills('pills-noload') : [];
+  const no_load_reasons = getSelectedPills('pills-noload');
 
-  const location   = document.getElementById('c-location').value;
-  const month      = document.getElementById('c-month').value;
-  const year       = document.getElementById('c-year').value;
-  if (!location) { toast('Please select a course location', 'error'); return; }
-  if (!month || !year) { toast('Please select the course month and year', 'error'); return; }
+  // Derive old-format immediate_load for backward compat
+  const maxL  = hasMax  && archState.maxillary.load  === 'yes';
+  const mandL = hasMand && archState.mandibular.load === 'yes';
+  let immediate_load = 'no';
+  if (maxL && mandL) immediate_load = 'both';
+  else if (maxL)     immediate_load = 'maxillary';
+  else if (mandL)    immediate_load = 'mandibular';
+
+  const prosthetic_workflow = [
+    hasMax  ? archState.maxillary.prosthetic  : null,
+    hasMand ? archState.mandibular.prosthetic : null,
+  ].filter(Boolean);
 
   const payload = {
     student_name,
-    date:                    document.getElementById('c-date').value,
+    date:                      document.getElementById('c-date').value,
     location,
-    course_month:            month,
-    course_year:             year,
+    course_month:              month,
+    course_year:               year,
     procedures,
-    num_implants:            parseInt(document.getElementById('c-implants').value) || 0,
+    num_implants:              parseInt(document.getElementById('c-implants').value) || 0,
     immediate_placement_teeth: document.getElementById('c-imm-teeth').value.trim(),
-    immediate_load:          load,
     no_load_reasons,
-    prosthetic_workflow:     [selectedProsthetic],
-    favorite_learned:        document.getElementById('c-favorite').value.trim(),
-    could_improve:           document.getElementById('c-improve').value.trim(),
+    immediate_load,
+    prosthetic_workflow,
+    maxillary_immediate_load:  hasMax  ? archState.maxillary.load  === 'yes' : null,
+    maxillary_prosthetic:      hasMax  ? archState.maxillary.prosthetic  || '' : '',
+    mandibular_immediate_load: hasMand ? archState.mandibular.load === 'yes' : null,
+    mandibular_prosthetic:     hasMand ? archState.mandibular.prosthetic || '' : '',
+    favorite_learned:          document.getElementById('c-favorite').value.trim(),
+    could_improve:             document.getElementById('c-improve').value.trim(),
   };
 
   try {
@@ -697,10 +706,8 @@ function resetCaseForm() {
   setDefaultDate();
   clearPills('pills-procedures');
   clearPills('pills-noload');
-  selectedLoad = null;
-  selectedProsthetic = null;
-  document.querySelectorAll('#choices-load .choice').forEach(b => b.classList.remove('sel'));
-  document.querySelectorAll('#choices-prosthetic .choice').forEach(b => b.classList.remove('sel'));
+  archState = { maxillary: { load: null, prosthetic: null }, mandibular: { load: null, prosthetic: null } };
+  document.getElementById('arch-sections').innerHTML = '';
   document.getElementById('noload-section').classList.add('hidden');
   document.getElementById('monthyear-section').classList.add('hidden');
   document.getElementById('c-implants').value = 0;
@@ -712,35 +719,112 @@ function toggleMonthYear() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// Arch Flowchart
+// ════════════════════════════════════════════════════════════════════════════
+const PROSTHETIC_OPTIONS = [
+  'AI design successful — immediately loaded',
+  'AI design successful — did not immediately load',
+  'Converted stock denture using SmartX',
+  'Delivered stock denture — did not immediately load',
+];
+
+function updateArchSections() {
+  const procs   = getSelectedPills('pills-procedures');
+  const hasMax  = procs.includes('Maxillary AOX');
+  const hasMand = procs.includes('Mandibular AOX');
+
+  if (!hasMax)  archState.maxillary  = { load: null, prosthetic: null };
+  if (!hasMand) archState.mandibular = { load: null, prosthetic: null };
+
+  const container = document.getElementById('arch-sections');
+  container.innerHTML = '';
+
+  if (hasMax)  container.insertAdjacentHTML('beforeend', buildArchSection('maxillary',  'Maxillary'));
+  if (hasMand) container.insertAdjacentHTML('beforeend', buildArchSection('mandibular', 'Mandibular'));
+
+  // Wire load buttons
+  container.querySelectorAll('.arch-load-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const arch = btn.dataset.arch;
+      container.querySelectorAll(`.arch-load-btn[data-arch="${arch}"]`).forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      archState[arch].load = btn.dataset.val;
+      updateNoloadSection();
+    });
+  });
+
+  // Wire prosthetic buttons
+  container.querySelectorAll('.arch-prosthetic-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const arch = btn.dataset.arch;
+      container.querySelectorAll(`.arch-prosthetic-btn[data-arch="${arch}"]`).forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      archState[arch].prosthetic = btn.dataset.val;
+    });
+  });
+
+  // Restore any previously selected state (if user toggled a pill off then back on)
+  ['maxillary', 'mandibular'].forEach(arch => {
+    if (archState[arch].load) {
+      container.querySelector(`.arch-load-btn[data-arch="${arch}"][data-val="${archState[arch].load}"]`)?.classList.add('sel');
+    }
+    if (archState[arch].prosthetic) {
+      container.querySelectorAll(`.arch-prosthetic-btn[data-arch="${arch}"]`).forEach(b => {
+        if (b.dataset.val === archState[arch].prosthetic) b.classList.add('sel');
+      });
+    }
+  });
+
+  updateNoloadSection();
+}
+
+function buildArchSection(arch, label) {
+  const isPurple = arch === 'maxillary';
+  const hd  = isPurple ? '#7c3aed' : '#0d9488';
+  const bg  = isPurple ? '#f5f3ff' : '#f0fdfa';
+  const mid = isPurple ? '#ede9fe' : '#ccfbf1';
+  return `
+    <div class="arch-card" style="border:2px solid ${mid};background:${bg}">
+      <div class="arch-card-hd" style="background:${hd}">🦷 ${label} Arch</div>
+      <div class="arch-card-body">
+        <div class="field" style="margin-bottom:14px">
+          <label style="color:${hd}">Did you immediately load the ${label} arch?</label>
+          <div class="choices">
+            <button type="button" class="choice arch-load-btn" data-arch="${arch}" data-val="yes">Yes — immediately loaded</button>
+            <button type="button" class="choice arch-load-btn" data-arch="${arch}" data-val="no">No</button>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label style="color:${hd}">Prosthetic / Digital Workflow — ${label}</label>
+          <div class="choices">
+            ${PROSTHETIC_OPTIONS.map(p => `<button type="button" class="choice arch-prosthetic-btn" data-arch="${arch}" data-val="${p}">${p}</button>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function updateNoloadSection() {
+  const procs   = getSelectedPills('pills-procedures');
+  const hasMax  = procs.includes('Maxillary AOX');
+  const hasMand = procs.includes('Mandibular AOX');
+  const anyNo   = (hasMax  && archState.maxillary.load  === 'no') ||
+                  (hasMand && archState.mandibular.load === 'no');
+  document.getElementById('noload-section').classList.toggle('hidden', !anyNo);
+  if (!anyNo) clearPills('pills-noload');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // Pills & Choices
 // ════════════════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-  // Wire pills
+  // Wire multi-select pill containers; procedure pills also trigger arch sections
   document.querySelectorAll('.pills').forEach(container => {
     container.addEventListener('click', e => {
       const pill = e.target.closest('.pill');
-      if (pill) pill.classList.toggle('sel');
-    });
-  });
-
-  // Wire choice buttons (immediate load)
-  document.querySelectorAll('#choices-load .choice').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#choices-load .choice').forEach(b => b.classList.remove('sel'));
-      btn.classList.add('sel');
-      selectedLoad = btn.dataset.val;
-      const noload = document.getElementById('noload-section');
-      noload.classList.toggle('hidden', selectedLoad !== 'no');
-      if (selectedLoad !== 'no') clearPills('pills-noload');
-    });
-  });
-
-  // Wire choice buttons (prosthetic workflow)
-  document.querySelectorAll('#choices-prosthetic .choice').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#choices-prosthetic .choice').forEach(b => b.classList.remove('sel'));
-      btn.classList.add('sel');
-      selectedProsthetic = btn.dataset.val;
+      if (!pill) return;
+      pill.classList.toggle('sel');
+      if (container.id === 'pills-procedures') updateArchSections();
     });
   });
 
@@ -870,6 +954,28 @@ function renderReflections() {
   `;
 }
 
+// Per-arch helpers — handle both old-format and new per-arch fields
+function getCaseImmLoad(c) {
+  if (c.maxillary_immediate_load !== null || c.mandibular_immediate_load !== null) {
+    return (c.maxillary_immediate_load  === true ? 1 : 0) +
+           (c.mandibular_immediate_load === true ? 1 : 0);
+  }
+  if (c.immediate_load === 'both') return 2;
+  if (c.immediate_load === 'maxillary' || c.immediate_load === 'mandibular') return 1;
+  return 0;
+}
+
+function getCaseAiOk(c) {
+  if (c.maxillary_immediate_load !== null || c.mandibular_immediate_load !== null) {
+    return (c.maxillary_prosthetic?.startsWith('AI design successful')  ? 1 : 0) +
+           (c.mandibular_prosthetic?.startsWith('AI design successful') ? 1 : 0);
+  }
+  const pw = c.prosthetic_workflow || [];
+  const p  = c.procedures || [];
+  if (!pw.some(v => v.startsWith('AI design successful'))) return 0;
+  return (p.includes('Maxillary AOX') ? 1 : 0) + (p.includes('Mandibular AOX') ? 1 : 0);
+}
+
 function computeOverallStats(cases) {
   let maxillary=0, mandibular=0, implants=0, extractions=0, immLoad=0;
   let ridge=0, vSinus=0, lSinus=0, aiOk=0, aiFail=0, stock=0;
@@ -887,20 +993,14 @@ function computeOverallStats(cases) {
     implants    += c.num_implants    || 0;
     extractions += c.num_extractions || 0;
 
-    if (c.immediate_load === 'maxillary') immLoad += 1;
-    else if (c.immediate_load === 'mandibular') immLoad += 1;
-    else if (c.immediate_load === 'both')  immLoad += 2;
+    immLoad += getCaseImmLoad(c);
+    aiOk    += getCaseAiOk(c);
 
     (c.no_load_reasons || []).forEach(r => noLoadCounts[r] = (noLoadCounts[r]||0)+1);
 
     const pw = c.prosthetic_workflow || [];
-    if (pw.some(v => v.startsWith('AI design successful'))) {
-      const p = c.procedures || [];
-      if (p.includes('Maxillary AOX')) aiOk++;
-      if (p.includes('Mandibular AOX')) aiOk++;
-    }
-    if (pw.includes('Tried AI and it did not work'))                         aiFail++;
-    if (pw.includes('Delivered stock denture'))                              stock++;
+    if (pw.includes('Tried AI and it did not work')) aiFail++;
+    if (pw.includes('Delivered stock denture'))       stock++;
 
     dateMap[c.date] = (dateMap[c.date]||0) + 1;
   });
@@ -1039,13 +1139,8 @@ function renderStudentTable() {
       if (p.includes('Unilateral Sinus Lift')) vSinus++;
       if (p.includes('Bilateral Sinus Lift')) lSinus++;
       implants += c.num_implants||0;
-      if (c.immediate_load==='maxillary') immLoad+=1;
-      else if (c.immediate_load==='mandibular') immLoad+=1;
-      else if (c.immediate_load==='both') immLoad+=2;
-      if ((c.prosthetic_workflow||[]).some(v => v.startsWith('AI design successful'))) {
-        if (p.includes('Maxillary AOX')) aiOk++;
-        if (p.includes('Mandibular AOX')) aiOk++;
-      }
+      immLoad  += getCaseImmLoad(c);
+      aiOk     += getCaseAiOk(c);
     });
     return { s, cases:sc.length, maxArch, mandArch, implants, immLoad, ridge, vSinus, lSinus, aiOk };
   }).sort((a,b)=>a.s.name.localeCompare(b.s.name));
@@ -1264,20 +1359,34 @@ function ecSelectProsthetic(btn) {
 
 async function saveCase(id) {
   const card = document.querySelector(`.edit-case-card[data-id="${id}"]`);
+  const procedures     = [...card.querySelectorAll('.pills .pill.sel')].filter(p=>!p.closest('.ec-noload-section')).map(p=>p.dataset.val);
+  const immediate_load = card.querySelector('.ec-load .choice.sel')?.dataset.val || 'no';
+  const prosthetic_sel = card.querySelector('.ec-prosthetic .choice.sel')?.dataset.val || '';
+  const hasMax  = procedures.includes('Maxillary AOX');
+  const hasMand = procedures.includes('Mandibular AOX');
+  // Derive per-arch fields so dashboard reads correctly for edited cases
+  const maxillary_immediate_load  = hasMax  ? (immediate_load === 'maxillary' || immediate_load === 'both') : null;
+  const mandibular_immediate_load = hasMand ? (immediate_load === 'mandibular' || immediate_load === 'both') : null;
+  const maxillary_prosthetic  = hasMax  && prosthetic_sel ? prosthetic_sel : '';
+  const mandibular_prosthetic = hasMand && prosthetic_sel ? prosthetic_sel : '';
   const payload = {
     student_name:             card.querySelector('.ec-student').value.trim(),
     date:                     card.querySelector('.ec-date').value,
     location:                 card.querySelector('.ec-location').value,
     course_month:             card.querySelector('.ec-month').value,
     course_year:              card.querySelector('.ec-year').value,
-    procedures:               [...card.querySelectorAll('.pills .pill.sel')].filter(p=>!p.closest('.ec-noload-section')).map(p=>p.dataset.val),
+    procedures,
     num_implants:             parseInt(card.querySelector('.ec-implants').value)||0,
     immediate_placement_teeth: card.querySelector('.ec-imm-teeth').value.trim(),
-    immediate_load:           card.querySelector('.ec-load .choice.sel')?.dataset.val || 'no',
+    immediate_load,
     no_load_reasons:          [...card.querySelectorAll('.ec-noload-section .pill.sel')].map(p=>p.dataset.val),
-    prosthetic_workflow:      card.querySelector('.ec-prosthetic .choice.sel') ? [card.querySelector('.ec-prosthetic .choice.sel').dataset.val] : [],
+    prosthetic_workflow:      prosthetic_sel ? [prosthetic_sel] : [],
     favorite_learned:         card.querySelector('.ec-favorite').value.trim(),
     could_improve:            card.querySelector('.ec-improve').value.trim(),
+    maxillary_immediate_load,
+    maxillary_prosthetic,
+    mandibular_immediate_load,
+    mandibular_prosthetic,
   };
   try {
     const updated = await store.updateCase(id, payload);

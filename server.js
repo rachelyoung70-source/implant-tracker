@@ -43,6 +43,10 @@ async function initDb() {
     `ALTER TABLE cases ADD COLUMN IF NOT EXISTS immediate_placement_teeth TEXT DEFAULT ''`,
     `ALTER TABLE cases ADD COLUMN IF NOT EXISTS favorite_learned TEXT DEFAULT ''`,
     `ALTER TABLE cases ADD COLUMN IF NOT EXISTS could_improve TEXT DEFAULT ''`,
+    `ALTER TABLE cases ADD COLUMN IF NOT EXISTS maxillary_immediate_load BOOLEAN DEFAULT NULL`,
+    `ALTER TABLE cases ADD COLUMN IF NOT EXISTS mandibular_immediate_load BOOLEAN DEFAULT NULL`,
+    `ALTER TABLE cases ADD COLUMN IF NOT EXISTS maxillary_prosthetic TEXT DEFAULT ''`,
+    `ALTER TABLE cases ADD COLUMN IF NOT EXISTS mandibular_prosthetic TEXT DEFAULT ''`,
   ];
   for (const sql of newCols) await pool.query(sql);
 }
@@ -94,14 +98,18 @@ app.post('/api/cases', async (req, res) => {
       procedures, num_implants, immediate_placement_teeth,
       immediate_load, no_load_reasons, prosthetic_workflow,
       favorite_learned, could_improve,
+      maxillary_immediate_load, maxillary_prosthetic,
+      mandibular_immediate_load, mandibular_prosthetic,
     } = req.body;
     const { rows } = await pool.query(`
       INSERT INTO cases
         (id, student_name, date, location, course_month, course_year,
          procedures, num_implants, immediate_placement_teeth,
          immediate_load, no_load_reasons, prosthetic_workflow,
-         favorite_learned, could_improve)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+         favorite_learned, could_improve,
+         maxillary_immediate_load, maxillary_prosthetic,
+         mandibular_immediate_load, mandibular_prosthetic)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
       RETURNING *
     `, [Date.now().toString(), student_name, date,
         location || '', course_month || '', course_year || '',
@@ -111,7 +119,9 @@ app.post('/api/cases', async (req, res) => {
         immediate_load || 'no',
         JSON.stringify(no_load_reasons || []),
         JSON.stringify(prosthetic_workflow || []),
-        favorite_learned || '', could_improve || '']);
+        favorite_learned || '', could_improve || '',
+        maxillary_immediate_load ?? null, maxillary_prosthetic || '',
+        mandibular_immediate_load ?? null, mandibular_prosthetic || '']);
     res.json(rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -123,6 +133,8 @@ app.patch('/api/cases/:id', async (req, res) => {
       'procedures','num_implants','immediate_placement_teeth',
       'immediate_load','no_load_reasons','prosthetic_workflow',
       'favorite_learned','could_improve',
+      'maxillary_immediate_load','maxillary_prosthetic',
+      'mandibular_immediate_load','mandibular_prosthetic',
     ];
     const JSON_COLS = new Set(['procedures','no_load_reasons','prosthetic_workflow']);
     const sets = [], vals = [];
