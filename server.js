@@ -25,10 +25,8 @@ async function initDb() {
       id TEXT PRIMARY KEY,
       student_name TEXT NOT NULL,
       date TEXT NOT NULL,
-      case_id TEXT DEFAULT '',
       procedures JSONB DEFAULT '[]',
       num_implants INTEGER DEFAULT 0,
-      num_extractions INTEGER DEFAULT 0,
       immediate_placement BOOLEAN DEFAULT FALSE,
       immediate_load TEXT DEFAULT 'no',
       no_load_reasons JSONB DEFAULT '[]',
@@ -37,6 +35,16 @@ async function initDb() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
+  // Migrate: add columns that may not exist in older deployments
+  const newCols = [
+    `ALTER TABLE cases ADD COLUMN IF NOT EXISTS location TEXT DEFAULT ''`,
+    `ALTER TABLE cases ADD COLUMN IF NOT EXISTS course_month TEXT DEFAULT ''`,
+    `ALTER TABLE cases ADD COLUMN IF NOT EXISTS course_year TEXT DEFAULT ''`,
+    `ALTER TABLE cases ADD COLUMN IF NOT EXISTS immediate_placement_teeth TEXT DEFAULT ''`,
+    `ALTER TABLE cases ADD COLUMN IF NOT EXISTS favorite_learned TEXT DEFAULT ''`,
+    `ALTER TABLE cases ADD COLUMN IF NOT EXISTS could_improve TEXT DEFAULT ''`,
+  ];
+  for (const sql of newCols) await pool.query(sql);
 }
 
 // ── Students ──────────────────────────────────────────────────────────────────
@@ -82,22 +90,53 @@ app.get('/api/cases', async (req, res) => {
 app.post('/api/cases', async (req, res) => {
   try {
     const {
-      student_name, date, case_id, procedures, num_implants, num_extractions,
-      immediate_placement, immediate_load, no_load_reasons, notes, prosthetic_workflow,
+      student_name, date, location, course_month, course_year,
+      procedures, num_implants, immediate_placement_teeth,
+      immediate_load, no_load_reasons, prosthetic_workflow,
+      favorite_learned, could_improve,
     } = req.body;
     const { rows } = await pool.query(`
       INSERT INTO cases
-        (id, student_name, date, case_id, procedures, num_implants, num_extractions,
-         immediate_placement, immediate_load, no_load_reasons, notes, prosthetic_workflow)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        (id, student_name, date, location, course_month, course_year,
+         procedures, num_implants, immediate_placement_teeth,
+         immediate_load, no_load_reasons, prosthetic_workflow,
+         favorite_learned, could_improve)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
       RETURNING *
-    `, [Date.now().toString(), student_name, date, case_id || '',
+    `, [Date.now().toString(), student_name, date,
+        location || '', course_month || '', course_year || '',
         JSON.stringify(procedures || []),
-        parseInt(num_implants) || 0, parseInt(num_extractions) || 0,
-        !!immediate_placement, immediate_load || 'no',
+        parseInt(num_implants) || 0,
+        immediate_placement_teeth || '',
+        immediate_load || 'no',
         JSON.stringify(no_load_reasons || []),
-        notes || '',
-        JSON.stringify(prosthetic_workflow || [])]);
+        JSON.stringify(prosthetic_workflow || []),
+        favorite_learned || '', could_improve || '']);
+    res.json(rows[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch('/api/cases/:id', async (req, res) => {
+  try {
+    const ALLOWED = [
+      'student_name','date','location','course_month','course_year',
+      'procedures','num_implants','immediate_placement_teeth',
+      'immediate_load','no_load_reasons','prosthetic_workflow',
+      'favorite_learned','could_improve',
+    ];
+    const JSON_COLS = new Set(['procedures','no_load_reasons','prosthetic_workflow']);
+    const sets = [], vals = [];
+    for (const key of ALLOWED) {
+      if (!(key in req.body)) continue;
+      sets.push(`${key} = $${sets.length + 1}`);
+      vals.push(JSON_COLS.has(key) ? JSON.stringify(req.body[key]) : req.body[key]);
+    }
+    if (!sets.length) return res.status(400).json({ error: 'Nothing to update' });
+    vals.push(req.params.id);
+    const { rows } = await pool.query(
+      `UPDATE cases SET ${sets.join(', ')} WHERE id = $${vals.length} RETURNING *`, vals
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Case not found' });
     res.json(rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
