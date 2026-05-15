@@ -242,11 +242,7 @@ th.num{text-align:right}
 
 <!-- ── Navigation ──────────────────────────────────────────────────────── -->
 <nav class="bottom-nav">
-  <button class="nav-btn active" id="nav-precourse" onclick="showTab('precourse')">
-    <span class="nav-icon">📋</span>
-    <span>Pre-Course</span>
-  </button>
-  <button class="nav-btn" id="nav-case" onclick="showTab('case')">
+  <button class="nav-btn active" id="nav-case" onclick="showTab('case')">
     <span class="nav-icon">➕</span>
     <span>New Case</span>
   </button>
@@ -260,49 +256,9 @@ th.num{text-align:right}
 <main class="content">
 
 <!-- ════════════════════════════════════════════════════════════════════════
-     TAB: Pre-Course
-════════════════════════════════════════════════════════════════════════════ -->
-<section id="tab-precourse" class="tab-section active">
-  <div class="section-hd">
-    <h2>Pre-Course Setup</h2>
-    <p>Complete once before submitting cases. Updates are saved automatically.</p>
-  </div>
-  <form id="precourse-form" class="card" onsubmit="submitPreCourse(event)">
-
-    <div class="field">
-      <label>Your Full Name</label>
-      <input type="text" id="pc-name" placeholder="e.g. Dr. Jane Smith" required autocomplete="name">
-    </div>
-
-    <div class="divider"></div>
-    <p style="font-size:13px;color:var(--g500);margin-bottom:16px">Experience before this course:</p>
-
-    <div class="row">
-      <div class="field">
-        <label>Prior All-on-X Arches</label>
-        <input type="number" id="pc-arches" min="0" value="0" placeholder="0">
-        <div class="hint">Full-arch cases completed before this course</div>
-      </div>
-      <div class="field">
-        <label>Prior Implants Placed</label>
-        <input type="number" id="pc-implants" min="0" value="0" placeholder="0">
-        <div class="hint">Total implants placed before this course</div>
-      </div>
-    </div>
-
-    <button type="submit" class="btn btn-primary btn-block mt8">Save Pre-Course Info</button>
-  </form>
-
-  <div id="registered-students" class="card mt16 hidden">
-    <div style="font-size:13px;font-weight:700;color:var(--g600);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">Registered Students</div>
-    <div id="student-list"></div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════════════════
      TAB: New Case
 ════════════════════════════════════════════════════════════════════════════ -->
-<section id="tab-case" class="tab-section">
+<section id="tab-case" class="tab-section active">
   <div class="section-hd">
     <h2>Submit New Case</h2>
     <p>Enter details after each surgical case.</p>
@@ -487,10 +443,6 @@ th.num{text-align:right}
   <div class="dash-section-title">Course Overview</div>
   <div class="stats-grid" id="overall-stats"></div>
 
-  <!-- Pre-Course Experience -->
-  <div class="dash-section-title">Pre-Course Experience</div>
-  <div id="precourse-stats-block"></div>
-
   <!-- Anonymous Reflections -->
   <div class="dash-section-title">Anonymous Reflections</div>
   <div class="reflections-grid" id="reflections-block"></div>
@@ -551,9 +503,6 @@ function showTab(tab) {
     buildWeekBar();
     loadAndRender();
   }
-  if (tab === 'precourse') {
-    renderRegisteredStudents();
-  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -587,57 +536,6 @@ async function loadAndRender() {
   buildCourseDateBar();
   applyFilters();
   populateDashboardStudentFilter();
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// Pre-Course Form
-// ════════════════════════════════════════════════════════════════════════════
-async function submitPreCourse(e) {
-  e.preventDefault();
-  const name = document.getElementById('pc-name').value.trim();
-  const prior_arches   = parseInt(document.getElementById('pc-arches').value) || 0;
-  const prior_implants = parseInt(document.getElementById('pc-implants').value) || 0;
-
-  if (!name) { toast('Please enter your name', 'error'); return; }
-
-  try {
-    const student = await store.upsertStudent({ name, prior_arches, prior_implants });
-    allStudents = await store.getStudents();
-    toast('Pre-course info saved for ' + student.name, 'success');
-    e.target.reset();
-    document.getElementById('pc-arches').value = 0;
-    document.getElementById('pc-implants').value = 0;
-    renderRegisteredStudents();
-  } catch (err) {
-    toast(err.message, 'error');
-  }
-}
-
-async function renderRegisteredStudents() {
-  if (!allStudents.length) {
-    allStudents = await store.getStudents();
-  }
-  const block = document.getElementById('registered-students');
-  const list  = document.getElementById('student-list');
-  if (!allStudents.length) { block.classList.add('hidden'); return; }
-  block.classList.remove('hidden');
-  list.innerHTML = allStudents.map(s => `
-    <div class="toggle-row">
-      <div>
-        <div style="font-weight:600;color:var(--g800)">${esc(s.name)}</div>
-        <div style="font-size:12px;color:var(--g500)">${s.prior_arches} prior arches · ${s.prior_implants} prior implants</div>
-      </div>
-      <button class="btn btn-outline btn-sm" onclick="editStudent('${esc(s.name)}',${s.prior_arches},${s.prior_implants})">Edit</button>
-    </div>
-  `).join('');
-}
-
-function editStudent(name, arches, implants) {
-  document.getElementById('pc-name').value = name;
-  document.getElementById('pc-arches').value = arches;
-  document.getElementById('pc-implants').value = implants;
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  toast('Edit info above and save', 'info');
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1024,7 +922,6 @@ function filterUpToDay(endDate, btn, weekStart) {
 function renderDashboard() {
   const stats = computeOverallStats(filteredCases);
   renderOverallStats(stats);
-  renderPreCourseStats();
   renderStudentTable();
   renderReflections();
 }
@@ -1147,71 +1044,6 @@ function renderOverallStats(s) {
       ${c.sub ? `<div class="metric-sub">${c.sub}</div>` : ''}
     </div>
   `).join('');
-}
-
-function renderPreCourseStats() {
-  const students = allStudents;
-  if (!students.length) {
-    document.getElementById('precourse-stats-block').innerHTML =
-      '<div class="empty"><div class="empty-icon">📋</div><p>No students registered yet.</p></div>';
-    return;
-  }
-
-  const totalPriorArches   = students.reduce((s,x) => s + (x.prior_arches||0), 0);
-  const totalPriorImplants = students.reduce((s,x) => s + (x.prior_implants||0), 0);
-  const avgArches   = students.length ? (totalPriorArches   / students.length).toFixed(1) : 0;
-  const avgImplants = students.length ? (totalPriorImplants / students.length).toFixed(1) : 0;
-
-  // Course totals for comparison
-  const courseArches   = filteredCases.reduce((s,c) => {
-    const p = c.procedures||[];
-    return s + (p.includes('Maxillary full arch')?1:0) + (p.includes('Mandibular full arch')?1:0);
-  }, 0);
-  const courseImplants = filteredCases.reduce((s,c) => s + (c.num_implants||0), 0);
-
-  document.getElementById('precourse-stats-block').innerHTML = `
-    <div class="pre-cmp">
-      <div class="cmp-card">
-        <div class="cmp-val" style="color:#7c3aed">${totalPriorArches}</div>
-        <div class="cmp-label">Total Prior Arches (Group)</div>
-      </div>
-      <div class="cmp-card">
-        <div class="cmp-val" style="color:#2563eb">${totalPriorImplants}</div>
-        <div class="cmp-label">Total Prior Implants (Group)</div>
-      </div>
-      <div class="cmp-card">
-        <div class="cmp-val" style="color:#7c3aed">${avgArches}</div>
-        <div class="cmp-label">Avg Prior Arches / Student</div>
-      </div>
-      <div class="cmp-card">
-        <div class="cmp-val" style="color:#2563eb">${avgImplants}</div>
-        <div class="cmp-label">Avg Prior Implants / Student</div>
-      </div>
-    </div>
-    <div class="cmp-card mt8" style="background:#f8fafc;border:1px solid var(--g200)">
-      <div style="display:flex;justify-content:space-around;flex-wrap:wrap;gap:16px;text-align:center">
-        <div>
-          <div style="font-size:11px;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Prior Arches</div>
-          <div style="font-size:24px;font-weight:800;color:#7c3aed">${totalPriorArches}</div>
-        </div>
-        <div style="font-size:22px;color:var(--g300);align-self:center">→</div>
-        <div>
-          <div style="font-size:11px;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Course Arches</div>
-          <div style="font-size:24px;font-weight:800;color:#059669">${courseArches}</div>
-        </div>
-        <div style="width:1px;background:var(--g200);display:none" class="vsep"></div>
-        <div>
-          <div style="font-size:11px;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Prior Implants</div>
-          <div style="font-size:24px;font-weight:800;color:#6366f1">${totalPriorImplants}</div>
-        </div>
-        <div style="font-size:22px;color:var(--g300);align-self:center">→</div>
-        <div>
-          <div style="font-size:11px;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Course Implants</div>
-          <div style="font-size:24px;font-weight:800;color:#059669">${courseImplants}</div>
-        </div>
-      </div>
-    </div>
-  `;
 }
 
 function renderStudentTable() {
@@ -1531,7 +1363,6 @@ function esc(str) {
 // ════════════════════════════════════════════════════════════════════════════
 async function init() {
   [allStudents, allCases] = await Promise.all([store.getStudents(), store.getCases()]);
-  renderRegisteredStudents();
   populateCaseStudentDropdown();
 }
 </script>
