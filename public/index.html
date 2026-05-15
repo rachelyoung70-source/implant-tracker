@@ -841,17 +841,17 @@ function renderStudentTable() {
   const tbody = document.getElementById('student-table-body');
   const summary = document.getElementById('student-needs-summary');
 
-  if (!allStudents.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--g400)">No students registered yet.</td></tr>';
+  // Build display list: registered students + anyone who submitted a case without registering
+  const caseOnlyNames = [...new Set(filteredCases.map(c => c.student_name))]
+    .filter(n => !allStudents.some(s => s.name.toLowerCase() === n.toLowerCase()))
+    .map(name => ({ id: name, name, prior_arches: 0, prior_implants: 0 }));
+  const displayStudents = [...allStudents, ...caseOnlyNames];
+
+  if (!displayStudents.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--g400)">No students or cases yet.</td></tr>';
     summary.innerHTML = '';
     return;
   }
-
-  // Merge registered students with any names that appear only in cases
-  const caseOnlyNames = [...new Set(filteredCases.map(c => c.student_name))]
-    .filter(n => !allStudents.some(s => s.name === n))
-    .map(name => ({ id: name, name, prior_arches: 0, prior_implants: 0 }));
-  const displayStudents = [...allStudents, ...caseOnlyNames];
 
   const rows = displayStudents.map(s => {
     const sc = filteredCases.filter(c => c.student_name === s.name);
