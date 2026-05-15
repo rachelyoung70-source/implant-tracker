@@ -278,16 +278,10 @@ th.num{text-align:right}
       <div class="hint" id="student-hint"></div>
     </div>
 
-    <!-- Date + Case ID -->
-    <div class="row">
-      <div class="field">
-        <label>Date</label>
-        <input type="date" id="c-date" required>
-      </div>
-      <div class="field">
-        <label>Patient / Case ID</label>
-        <input type="text" id="c-caseid" placeholder="e.g. PT-001">
-      </div>
+    <!-- Date -->
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="c-date" required>
     </div>
 
     <!-- Procedures -->
@@ -303,26 +297,15 @@ th.num{text-align:right}
     </div>
 
     <!-- Surgical Details -->
-    <div class="row">
-      <div class="field">
-        <label>Implants Placed</label>
-        <input type="number" id="c-implants" min="0" value="0">
-      </div>
-      <div class="field">
-        <label>Extractions</label>
-        <input type="number" id="c-extractions" min="0" value="0">
-      </div>
+    <div class="field">
+      <label>Number of Implants Placed</label>
+      <input type="number" id="c-implants" min="0" value="0" required>
     </div>
 
     <div class="field">
-      <label>Immediate Placement?</label>
-      <div class="toggle-row">
-        <span class="toggle-label">Implants placed into fresh extraction sockets</span>
-        <label class="toggle">
-          <input type="checkbox" id="c-imm-place">
-          <span class="slider"></span>
-        </label>
-      </div>
+      <label>Tooth Numbers With Immediate Placement</label>
+      <input type="text" id="c-imm-teeth" placeholder="e.g. #3, #14, #19 — or write None" required>
+      <div class="hint">Implants placed into fresh extraction sockets. Write None if not applicable.</div>
     </div>
 
     <!-- Immediate Load -->
@@ -351,17 +334,23 @@ th.num{text-align:right}
     <!-- Prosthetic Workflow -->
     <div class="field">
       <label>Prosthetic / Digital Workflow</label>
-      <div class="pills" id="pills-prosthetic">
-        <div class="pill" data-val="Used AI to successfully design temporary prosthesis">AI design — successful</div>
-        <div class="pill" data-val="Tried AI and it did not work">AI design — did not work</div>
-        <div class="pill" data-val="Delivered stock denture">Delivered stock denture</div>
+      <div class="choices" id="choices-prosthetic">
+        <button type="button" class="choice" data-val="AI design successful — immediately loaded">AI design successful — immediately loaded</button>
+        <button type="button" class="choice" data-val="AI design successful — did not immediately load">AI design successful — did not immediately load</button>
+        <button type="button" class="choice" data-val="Converted stock denture using SmartX">Converted stock denture using SmartX</button>
+        <button type="button" class="choice" data-val="Delivered stock denture — did not immediately load">Delivered stock denture — did not immediately load</button>
       </div>
     </div>
 
-    <!-- Notes -->
+    <!-- Reflections -->
     <div class="field">
-      <label>Notes <span style="font-weight:400;text-transform:none;color:var(--g400)">(optional)</span></label>
-      <textarea id="c-notes" placeholder="Any observations, complications, or comments…"></textarea>
+      <label>What was your favorite thing you learned today?</label>
+      <textarea id="c-favorite" placeholder="Share what stood out most to you…" required></textarea>
+    </div>
+
+    <div class="field">
+      <label>What could have been improved today?</label>
+      <textarea id="c-improve" placeholder="Any areas for growth or suggestions…" required></textarea>
     </div>
 
     <button type="submit" class="btn btn-primary btn-block">Submit Case</button>
@@ -446,6 +435,7 @@ let allStudents = [];
 let allCases    = [];
 let filteredCases = [];
 let selectedLoad = null;
+let selectedProsthetic = null;
 
 // ════════════════════════════════════════════════════════════════════════════
 // Navigation
@@ -570,25 +560,27 @@ async function submitCase(e) {
   const student_name = document.getElementById('c-student').value.trim();
   if (!student_name) { toast('Please enter your name', 'error'); return; }
 
+  const procedures = getSelectedPills('pills-procedures');
+  if (!procedures.length) { toast('Please select at least one procedure', 'error'); return; }
+
   const load = selectedLoad;
   if (!load) { toast('Please select an immediate load option', 'error'); return; }
 
-  const procedures = getSelectedPills('pills-procedures');
-  const prosthetic_workflow = getSelectedPills('pills-prosthetic');
+  if (!selectedProsthetic) { toast('Please select a prosthetic workflow option', 'error'); return; }
+
   const no_load_reasons = load === 'no' ? getSelectedPills('pills-noload') : [];
 
   const payload = {
     student_name,
-    date:                document.getElementById('c-date').value,
-    case_id:             document.getElementById('c-caseid').value.trim(),
+    date:                    document.getElementById('c-date').value,
     procedures,
-    num_implants:        parseInt(document.getElementById('c-implants').value) || 0,
-    num_extractions:     parseInt(document.getElementById('c-extractions').value) || 0,
-    immediate_placement: document.getElementById('c-imm-place').checked,
-    immediate_load:      load,
+    num_implants:            parseInt(document.getElementById('c-implants').value) || 0,
+    immediate_placement_teeth: document.getElementById('c-imm-teeth').value.trim(),
+    immediate_load:          load,
     no_load_reasons,
-    notes:               document.getElementById('c-notes').value.trim(),
-    prosthetic_workflow,
+    prosthetic_workflow:     [selectedProsthetic],
+    favorite_learned:        document.getElementById('c-favorite').value.trim(),
+    could_improve:           document.getElementById('c-improve').value.trim(),
   };
 
   try {
@@ -606,12 +598,12 @@ function resetCaseForm() {
   setDefaultDate();
   clearPills('pills-procedures');
   clearPills('pills-noload');
-  clearPills('pills-prosthetic');
   selectedLoad = null;
+  selectedProsthetic = null;
   document.querySelectorAll('#choices-load .choice').forEach(b => b.classList.remove('sel'));
+  document.querySelectorAll('#choices-prosthetic .choice').forEach(b => b.classList.remove('sel'));
   document.getElementById('noload-section').classList.add('hidden');
   document.getElementById('c-implants').value = 0;
-  document.getElementById('c-extractions').value = 0;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -635,6 +627,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const noload = document.getElementById('noload-section');
       noload.classList.toggle('hidden', selectedLoad !== 'no');
       if (selectedLoad !== 'no') clearPills('pills-noload');
+    });
+  });
+
+  // Wire choice buttons (prosthetic workflow)
+  document.querySelectorAll('#choices-prosthetic .choice').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#choices-prosthetic .choice').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      selectedProsthetic = btn.dataset.val;
     });
   });
 
