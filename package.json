@@ -1,0 +1,13 @@
+{
+  "name": "implant-case-tracker",
+  "version": "1.0.0",
+  "description": "Level 3 Live Implant Training Case Tracker",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.3"
+  }
+}

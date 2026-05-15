@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Level 3 Implant Tracker</title>
+<style>
+/* ── Reset & Variables ──────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --primary:#2563eb;--primary-dk:#1d4ed8;--primary-lt:#eff6ff;--primary-mid:#bfdbfe;
+  --success:#059669;--success-lt:#ecfdf5;
+  --warn:#d97706;--warn-lt:#fffbeb;
+  --danger:#dc2626;--danger-lt:#fef2f2;
+  --purple:#7c3aed;--purple-lt:#f5f3ff;
+  --teal:#0d9488;--teal-lt:#f0fdfa;
+  --g50:#f8fafc;--g100:#f1f5f9;--g200:#e2e8f0;--g300:#cbd5e1;
+  --g400:#94a3b8;--g500:#64748b;--g600:#475569;--g700:#334155;--g800:#1e293b;--g900:#0f172a;
+  --radius:12px;--radius-sm:8px;--radius-lg:16px;
+  --shadow:0 1px 3px rgba(0,0,0,.10),0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:0 4px 6px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.05);
+  --nav-h:68px;
+}
+html,body{height:100%;background:var(--g50);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:var(--g800);font-size:16px;line-height:1.5}
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.app-header{background:linear-gradient(135deg,var(--primary-dk),var(--primary));color:#fff;padding:16px 20px;position:sticky;top:0;z-index:50;box-shadow:0 2px 8px rgba(37,99,235,.3)}
+.header-inner{display:flex;align-items:center;gap:12px;max-width:900px;margin:0 auto}
+.header-icon{font-size:26px;line-height:1}
+.header-title{font-size:18px;font-weight:700;letter-spacing:-.3px}
+.header-sub{font-size:12px;opacity:.8;margin-top:1px}
+
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--g200);display:flex;z-index:50;box-shadow:0 -2px 12px rgba(0,0,0,.08);padding-bottom:env(safe-area-inset-bottom)}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 4px;background:none;border:none;cursor:pointer;color:var(--g400);transition:color .15s;font-size:11px;font-weight:500;-webkit-tap-highlight-color:transparent}
+.nav-btn.active{color:var(--primary)}
+.nav-btn .nav-icon{font-size:20px;line-height:1}
+.nav-btn:active{opacity:.7}
+
+.content{max-width:900px;margin:0 auto;padding:20px 16px calc(var(--nav-h) + 24px);min-height:calc(100vh - 60px)}
+.tab-section{display:none}
+.tab-section.active{display:block}
+
+/* ── Section headings ───────────────────────────────────────────────────── */
+.section-hd{margin-bottom:20px}
+.section-hd h2{font-size:22px;font-weight:700;color:var(--g900)}
+.section-hd p{font-size:14px;color:var(--g500);margin-top:4px}
+.dash-section-title{font-size:16px;font-weight:700;color:var(--g700);margin:28px 0 12px;display:flex;align-items:center;gap:8px}
+.dash-section-title::after{content:'';flex:1;height:1px;background:var(--g200)}
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:20px}
+.card+.card{margin-top:16px}
+
+/* ── Form elements ──────────────────────────────────────────────────────── */
+.field{margin-bottom:20px}
+.field label{display:block;font-size:13px;font-weight:600;color:var(--g600);margin-bottom:6px;letter-spacing:.3px;text-transform:uppercase}
+.field input[type=text],
+.field input[type=number],
+.field input[type=date],
+.field select,
+.field textarea{width:100%;padding:12px 14px;border:1.5px solid var(--g200);border-radius:var(--radius-sm);font-size:16px;color:var(--g800);background:#fff;transition:border-color .15s,box-shadow .15s;appearance:none;-webkit-appearance:none}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-mid)}
+.field textarea{resize:vertical;min-height:80px;font-family:inherit}
+.field select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
+.field .hint{font-size:12px;color:var(--g400);margin-top:4px}
+
+/* ── Pills (multi-select) ───────────────────────────────────────────────── */
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.pill{padding:8px 14px;border-radius:100px;border:1.5px solid var(--g200);background:#fff;color:var(--g600);font-size:14px;cursor:pointer;transition:all .15s;user-select:none;-webkit-tap-highlight-color:transparent;line-height:1.3}
+.pill:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-lt)}
+.pill.sel{background:var(--primary);border-color:var(--primary);color:#fff}
+
+/* ── Choice buttons (single-select) ────────────────────────────────────── */
+.choices{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.choice{padding:12px 16px;border-radius:var(--radius-sm);border:1.5px solid var(--g200);background:#fff;color:var(--g700);font-size:15px;cursor:pointer;transition:all .15s;text-align:left;user-select:none;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;gap:10px}
+.choice::before{content:'';width:18px;height:18px;border-radius:50%;border:2px solid var(--g300);flex-shrink:0;transition:all .15s}
+.choice:hover{border-color:var(--primary);color:var(--primary)}
+.choice.sel{border-color:var(--primary);background:var(--primary-lt);color:var(--primary-dk);font-weight:600}
+.choice.sel::before{background:var(--primary);border-color:var(--primary);box-shadow:inset 0 0 0 3px #fff}
+
+/* ── Toggle ─────────────────────────────────────────────────────────────── */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--g100)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-label{font-size:15px;color:var(--g700)}
+.toggle{position:relative;display:inline-block;width:48px;height:26px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:var(--g300);border-radius:13px;cursor:pointer;transition:.2s}
+.slider::before{position:absolute;content:'';height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+input:checked+.slider{background:var(--primary)}
+input:checked+.slider::before{transform:translateX(22px)}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 24px;border-radius:var(--radius-sm);font-size:16px;font-weight:600;cursor:pointer;border:none;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-dk)}
+.btn-primary:active{transform:scale(.98)}
+.btn-block{width:100%}
+.btn-sm{padding:8px 16px;font-size:13px}
+.btn-outline{background:#fff;border:1.5px solid var(--g200);color:var(--g600)}
+.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+.btn-danger-sm{background:var(--danger-lt);color:var(--danger);border:1px solid #fecaca;padding:4px 10px;font-size:12px;border-radius:6px;cursor:pointer}
+
+/* ── Metric cards ───────────────────────────────────────────────────────── */
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+@media(min-width:600px){.stats-grid{grid-template-columns:repeat(4,1fr)}}
+.metric{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:4px;position:relative;overflow:hidden}
+.metric::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--metric-color,var(--primary))}
+.metric-val{font-size:28px;font-weight:800;color:var(--metric-color,var(--g900));line-height:1}
+.metric-label{font-size:12px;color:var(--g500);font-weight:500;line-height:1.3}
+.metric-sub{font-size:11px;color:var(--g400);margin-top:2px}
+
+
+/* ── Filter bar ─────────────────────────────────────────────────────────── */
+.filter-bar{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.filter-bar .field{margin-bottom:0;flex:1;min-width:140px}
+.filter-bar label{font-size:11px}
+.filter-bar input,.filter-bar select{padding:9px 12px;font-size:14px}
+
+/* ── Student table ──────────────────────────────────────────────────────── */
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:600px}
+thead{background:var(--g50)}
+th{text-align:left;padding:10px 12px;font-size:11px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;border-bottom:1px solid var(--g200)}
+td{padding:11px 12px;border-bottom:1px solid var(--g100);color:var(--g700);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.td-name{font-weight:600;color:var(--g900)}
+.td-num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:var(--g800)}
+th.num{text-align:right}
+
+/* ── Cases list ─────────────────────────────────────────────────────────── */
+.case-item{padding:14px;border-radius:var(--radius-sm);border:1px solid var(--g200);background:#fff;margin-bottom:10px}
+.case-item-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.case-item-name{font-weight:700;color:var(--g800)}
+.case-item-date{font-size:12px;color:var(--g400)}
+.case-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.tag{display:inline-block;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:500;background:var(--primary-lt);color:var(--primary-dk)}
+.tag.green{background:var(--success-lt);color:var(--success)}
+.tag.orange{background:var(--warn-lt);color:var(--warn)}
+.tag.purple{background:var(--purple-lt);color:var(--purple)}
+.case-item-footer{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--g500)}
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
+.empty{text-align:center;padding:40px 20px;color:var(--g400)}
+.empty-icon{font-size:40px;margin-bottom:12px}
+.empty p{font-size:14px}
+
+/* ── Toast ──────────────────────────────────────────────────────────────── */
+#toast-root{position:fixed;bottom:calc(var(--nav-h) + 12px);left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{padding:12px 20px;border-radius:100px;font-size:14px;font-weight:600;color:#fff;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none;white-space:nowrap;box-shadow:var(--shadow-md)}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.success{background:var(--success)}
+.toast.error{background:var(--danger)}
+.toast.info{background:var(--g700)}
+
+/* ── Utility ────────────────────────────────────────────────────────────── */
+.hidden{display:none!important}
+.mt8{margin-top:8px}
+.mt16{margin-top:16px}
+.row{display:flex;gap:12px}
+.row .field{flex:1}
+.badge{display:inline-block;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:700}
+.badge-blue{background:var(--primary-lt);color:var(--primary)}
+.badge-green{background:var(--success-lt);color:var(--success)}
+.badge-warn{background:var(--warn-lt);color:var(--warn)}
+
+/* ── Status badges (student table) ─────────────────────────────────────── */
+.sb{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:100px;font-size:13px;font-weight:700;white-space:nowrap}
+.sb-done{background:#dcfce7;color:#15803d}
+.sb-needed{background:#fef9c3;color:#92400e;border:1.5px solid #fde68a;animation:pulse-warn 2s ease-in-out infinite}
+.sb-na{background:var(--g100);color:var(--g400);font-weight:500}
+@keyframes pulse-warn{0%,100%{opacity:1}50%{opacity:.65}}
+
+/* ── Needs summary bar ──────────────────────────────────────────────────── */
+.needs-summary{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.need-chip{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:700}
+.need-chip-warn{background:#fef9c3;color:#92400e;border:1.5px solid #fde68a}
+.need-chip-ok{background:#dcfce7;color:#15803d;border:1.5px solid #bbf7d0}
+.need-chip-num{font-size:20px;font-weight:900;line-height:1}
+.divider{height:1px;background:var(--g100);margin:20px 0}
+.pre-cmp{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(min-width:500px){.pre-cmp{grid-template-columns:repeat(4,1fr)}}
+.cmp-card{background:#fff;border-radius:var(--radius-sm);border:1px solid var(--g200);padding:14px;text-align:center}
+.cmp-val{font-size:22px;font-weight:800;color:var(--g900)}
+.cmp-label{font-size:11px;color:var(--g500);margin-top:2px}
+.cmp-bar-wrap{margin-top:8px}
+.student-select-hint{font-size:13px;color:var(--g500);padding:12px;background:var(--warn-lt);border-radius:var(--radius-sm);border:1px solid #fde68a}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<header class="app-header">
+  <div class="header-inner">
+    <span class="header-icon">🦷</span>
+    <div>
+      <div class="header-title">Implant Case Tracker</div>
+      <div class="header-sub">Level 3 Live Training</div>
+    </div>
+  </div>
+</header>
+
+<!-- ── Navigation ──────────────────────────────────────────────────────── -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="nav-precourse" onclick="showTab('precourse')">
+    <span class="nav-icon">📋</span>
+    <span>Pre-Course</span>
+  </button>
+  <button class="nav-btn" id="nav-case" onclick="showTab('case')">
+    <span class="nav-icon">➕</span>
+    <span>New Case</span>
+  </button>
+  <button class="nav-btn" id="nav-dashboard" onclick="showTab('dashboard')">
+    <span class="nav-icon">📊</span>
+    <span>Dashboard</span>
+  </button>
+</nav>
+
+<!-- ── Content ─────────────────────────────────────────────────────────── -->
+<main class="content">
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     TAB: Pre-Course
+════════════════════════════════════════════════════════════════════════════ -->
+<section id="tab-precourse" class="tab-section active">
+  <div class="section-hd">
+    <h2>Pre-Course Setup</h2>
+    <p>Complete once before submitting cases. Updates are saved automatically.</p>
+  </div>
+  <form id="precourse-form" class="card" onsubmit="submitPreCourse(event)">
+
+    <div class="field">
+      <label>Your Full Name</label>
+      <input type="text" id="pc-name" placeholder="e.g. Dr. Jane Smith" required autocomplete="name">
+    </div>
+
+    <div class="divider"></div>
+    <p style="font-size:13px;color:var(--g500);margin-bottom:16px">Experience before this course:</p>
+
+    <div class="row">
+      <div class="field">
+        <label>Prior All-on-X Arches</label>
+        <input type="number" id="pc-arches" min="0" value="0" placeholder="0">
+        <div class="hint">Full-arch cases completed before this course</div>
+      </div>
+      <div class="field">
+        <label>Prior Implants Placed</label>
+        <input type="number" id="pc-implants" min="0" value="0" placeholder="0">
+        <div class="hint">Total implants placed before this course</div>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block mt8">Save Pre-Course Info</button>
+  </form>
+
+  <div id="registered-students" class="card mt16 hidden">
+    <div style="font-size:13px;font-weight:700;color:var(--g600);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">Registered Students</div>
+    <div id="student-list"></div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     TAB: New Case
+════════════════════════════════════════════════════════════════════════════ -->
+<section id="tab-case" class="tab-section">
+  <div class="section-hd">
+    <h2>Submit New Case</h2>
+    <p>Enter details after each surgical case.</p>
+  </div>
+  <form id="case-form" class="card" onsubmit="submitCase(event)">
+
+    <!-- Student Name -->
+    <div class="field">
+      <label>Student Name</label>
+      <input type="text" id="c-student" list="student-datalist" placeholder="Select or type your name" required autocomplete="off">
+      <datalist id="student-datalist"></datalist>
+      <div class="hint" id="student-hint"></div>
+    </div>
+
+    <!-- Date + Case ID -->
+    <div class="row">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="c-date" required>
+      </div>
+      <div class="field">
+        <label>Patient / Case ID</label>
+        <input type="text" id="c-caseid" placeholder="e.g. PT-001">
+      </div>
+    </div>
+
+    <!-- Procedures -->
+    <div class="field">
+      <label>Procedures Performed</label>
+      <div class="pills" id="pills-procedures">
+        <div class="pill" data-val="Maxillary full arch">Maxillary full arch</div>
+        <div class="pill" data-val="Mandibular full arch">Mandibular full arch</div>
+        <div class="pill" data-val="Ridge augmentation">Ridge augmentation</div>
+        <div class="pill" data-val="Vertical sinus lift">Vertical sinus lift</div>
+        <div class="pill" data-val="Lateral sinus lift">Lateral sinus lift</div>
+      </div>
+    </div>
+
+    <!-- Surgical Details -->
+    <div class="row">
+      <div class="field">
+        <label>Implants Placed</label>
+        <input type="number" id="c-implants" min="0" value="0">
+      </div>
+      <div class="field">
+        <label>Extractions</label>
+        <input type="number" id="c-extractions" min="0" value="0">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Immediate Placement?</label>
+      <div class="toggle-row">
+        <span class="toggle-label">Implants placed into fresh extraction sockets</span>
+        <label class="toggle">
+          <input type="checkbox" id="c-imm-place">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Immediate Load -->
+    <div class="field">
+      <label>Did You Immediately Load?</label>
+      <div class="choices" id="choices-load">
+        <button type="button" class="choice" data-val="maxillary">Yes — Maxillary</button>
+        <button type="button" class="choice" data-val="mandibular">Yes — Mandibular</button>
+        <button type="button" class="choice" data-val="both">Yes — Both arches</button>
+        <button type="button" class="choice" data-val="no">No</button>
+      </div>
+    </div>
+
+    <!-- Conditional: No-load reasons -->
+    <div class="field hidden" id="noload-section">
+      <label>Why Was the Arch Not Immediately Loaded?</label>
+      <div class="pills" id="pills-noload">
+        <div class="pill" data-val="Insufficient implant torque/stability">Insufficient torque / stability</div>
+        <div class="pill" data-val="Vertical sinus lift performed">Vertical sinus lift performed</div>
+        <div class="pill" data-val="Lateral sinus lift performed">Lateral sinus lift performed</div>
+        <div class="pill" data-val="Extensive bone grafting/ridge augmentation">Extensive bone grafting / ridge augmentation</div>
+        <div class="pill" data-val="Other">Other</div>
+      </div>
+    </div>
+
+    <!-- Prosthetic Workflow -->
+    <div class="field">
+      <label>Prosthetic / Digital Workflow</label>
+      <div class="pills" id="pills-prosthetic">
+        <div class="pill" data-val="Used AI to successfully design temporary prosthesis">AI design — successful</div>
+        <div class="pill" data-val="Tried AI and it did not work">AI design — did not work</div>
+        <div class="pill" data-val="Delivered stock denture">Delivered stock denture</div>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="field">
+      <label>Notes <span style="font-weight:400;text-transform:none;color:var(--g400)">(optional)</span></label>
+      <textarea id="c-notes" placeholder="Any observations, complications, or comments…"></textarea>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block">Submit Case</button>
+  </form>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     TAB: Dashboard
+════════════════════════════════════════════════════════════════════════════ -->
+<section id="tab-dashboard" class="tab-section">
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <div class="field">
+      <label>Filter by Student</label>
+      <select id="f-student" onchange="applyFilters()">
+        <option value="">All Students</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Start Date</label>
+      <input type="date" id="f-start" onchange="applyFilters()">
+    </div>
+    <div class="field">
+      <label>End Date</label>
+      <input type="date" id="f-end" onchange="applyFilters()">
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="clearFilters()">Clear</button>
+  </div>
+
+  <!-- Student Breakdown Table -->
+  <div class="dash-section-title">Student Breakdown</div>
+  <div id="student-needs-summary" class="needs-summary"></div>
+  <div class="card">
+    <div class="table-wrap">
+      <table id="student-table">
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th class="num">Cases</th>
+            <th>Immediate Load</th>
+            <th>AI Prosthesis</th>
+            <th class="num">Maxillary Arch</th>
+            <th class="num">Mandibular Arch</th>
+            <th class="num">Implants</th>
+            <th class="num">Ridge Augmentation</th>
+            <th class="num">Vertical Sinus Lift</th>
+            <th class="num">Lateral Sinus Lift</th>
+          </tr>
+        </thead>
+        <tbody id="student-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Overall Stats -->
+  <div class="dash-section-title">Course Overview</div>
+  <div class="stats-grid" id="overall-stats"></div>
+
+  <!-- Pre-Course Experience -->
+  <div class="dash-section-title">Pre-Course Experience</div>
+  <div id="precourse-stats-block"></div>
+
+
+</section>
+
+</main>
+</div><!-- #app -->
+
+<!-- Toast container -->
+<div id="toast-root"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+// Constants
+// ════════════════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════════════════
+// State
+// ════════════════════════════════════════════════════════════════════════════
+let allStudents = [];
+let allCases    = [];
+let filteredCases = [];
+let selectedLoad = null;
+
+// ════════════════════════════════════════════════════════════════════════════
+// Navigation
+// ════════════════════════════════════════════════════════════════════════════
+function showTab(tab) {
+  document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('nav-' + tab).classList.add('active');
+
+  if (tab === 'case') {
+    populateCaseStudentDropdown();
+    setDefaultDate();
+  }
+  if (tab === 'dashboard') {
+    loadAndRender();
+  }
+  if (tab === 'precourse') {
+    renderRegisteredStudents();
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Storage — server API via fetch
+// ════════════════════════════════════════════════════════════════════════════
+async function apiFetch(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Request failed');
+  }
+  return res.json();
+}
+
+const store = {
+  getStudents()                        { return apiFetch('GET',    '/api/students'); },
+  upsertStudent(payload)               { return apiFetch('POST',   '/api/students', payload); },
+  getCases(params = {})                {
+    const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([,v])=>v)));
+    return apiFetch('GET', '/api/cases' + (q.size ? '?'+q : ''));
+  },
+  addCase(payload)                     { return apiFetch('POST',   '/api/cases', payload); },
+  deleteCase(id)                       { return apiFetch('DELETE', '/api/cases/'+id); },
+};
+
+async function loadAndRender() {
+  [allStudents, allCases] = await Promise.all([store.getStudents(), store.getCases()]);
+  applyFilters();
+  populateDashboardStudentFilter();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Pre-Course Form
+// ════════════════════════════════════════════════════════════════════════════
+async function submitPreCourse(e) {
+  e.preventDefault();
+  const name = document.getElementById('pc-name').value.trim();
+  const prior_arches   = parseInt(document.getElementById('pc-arches').value) || 0;
+  const prior_implants = parseInt(document.getElementById('pc-implants').value) || 0;
+
+  if (!name) { toast('Please enter your name', 'error'); return; }
+
+  try {
+    const student = await store.upsertStudent({ name, prior_arches, prior_implants });
+    allStudents = await store.getStudents();
+    toast('Pre-course info saved for ' + student.name, 'success');
+    e.target.reset();
+    document.getElementById('pc-arches').value = 0;
+    document.getElementById('pc-implants').value = 0;
+    renderRegisteredStudents();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function renderRegisteredStudents() {
+  if (!allStudents.length) {
+    allStudents = await store.getStudents();
+  }
+  const block = document.getElementById('registered-students');
+  const list  = document.getElementById('student-list');
+  if (!allStudents.length) { block.classList.add('hidden'); return; }
+  block.classList.remove('hidden');
+  list.innerHTML = allStudents.map(s => `
+    <div class="toggle-row">
+      <div>
+        <div style="font-weight:600;color:var(--g800)">${esc(s.name)}</div>
+        <div style="font-size:12px;color:var(--g500)">${s.prior_arches} prior arches · ${s.prior_implants} prior implants</div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="editStudent('${esc(s.name)}',${s.prior_arches},${s.prior_implants})">Edit</button>
+    </div>
+  `).join('');
+}
+
+function editStudent(name, arches, implants) {
+  document.getElementById('pc-name').value = name;
+  document.getElementById('pc-arches').value = arches;
+  document.getElementById('pc-implants').value = implants;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  toast('Edit info above and save', 'info');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Case Form
+// ════════════════════════════════════════════════════════════════════════════
+function setDefaultDate() {
+  const today = new Date().toISOString().slice(0, 10);
+  const el = document.getElementById('c-date');
+  if (!el.value) el.value = today;
+}
+
+function populateCaseStudentDropdown() {
+  const dl = document.getElementById('student-datalist');
+  dl.innerHTML = allStudents.map(s => `<option value="${esc(s.name)}">`).join('');
+}
+
+async function submitCase(e) {
+  e.preventDefault();
+
+  const student_name = document.getElementById('c-student').value.trim();
+  if (!student_name) { toast('Please enter your name', 'error'); return; }
+
+  const load = selectedLoad;
+  if (!load) { toast('Please select an immediate load option', 'error'); return; }
+
+  const procedures = getSelectedPills('pills-procedures');
+  const prosthetic_workflow = getSelectedPills('pills-prosthetic');
+  const no_load_reasons = load === 'no' ? getSelectedPills('pills-noload') : [];
+
+  const payload = {
+    student_name,
+    date:                document.getElementById('c-date').value,
+    case_id:             document.getElementById('c-caseid').value.trim(),
+    procedures,
+    num_implants:        parseInt(document.getElementById('c-implants').value) || 0,
+    num_extractions:     parseInt(document.getElementById('c-extractions').value) || 0,
+    immediate_placement: document.getElementById('c-imm-place').checked,
+    immediate_load:      load,
+    no_load_reasons,
+    notes:               document.getElementById('c-notes').value.trim(),
+    prosthetic_workflow,
+  };
+
+  try {
+    await store.addCase(payload);
+    toast('Case submitted!', 'success');
+    resetCaseForm();
+    allCases = await store.getCases();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+function resetCaseForm() {
+  document.getElementById('case-form').reset();
+  setDefaultDate();
+  clearPills('pills-procedures');
+  clearPills('pills-noload');
+  clearPills('pills-prosthetic');
+  selectedLoad = null;
+  document.querySelectorAll('#choices-load .choice').forEach(b => b.classList.remove('sel'));
+  document.getElementById('noload-section').classList.add('hidden');
+  document.getElementById('c-implants').value = 0;
+  document.getElementById('c-extractions').value = 0;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Pills & Choices
+// ════════════════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  // Wire pills
+  document.querySelectorAll('.pills').forEach(container => {
+    container.addEventListener('click', e => {
+      const pill = e.target.closest('.pill');
+      if (pill) pill.classList.toggle('sel');
+    });
+  });
+
+  // Wire choice buttons (immediate load)
+  document.querySelectorAll('#choices-load .choice').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#choices-load .choice').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      selectedLoad = btn.dataset.val;
+      const noload = document.getElementById('noload-section');
+      noload.classList.toggle('hidden', selectedLoad !== 'no');
+      if (selectedLoad !== 'no') clearPills('pills-noload');
+    });
+  });
+
+  // Student name hint
+  document.getElementById('c-student').addEventListener('change', function() {
+    const s = allStudents.find(x => x.name.toLowerCase() === this.value.trim().toLowerCase());
+    document.getElementById('student-hint').textContent = s
+      ? `Registered · ${s.prior_arches} prior arches · ${s.prior_implants} prior implants`
+      : 'Not yet registered — go to Pre-Course tab to add experience info.';
+  });
+
+  setDefaultDate();
+  init();
+});
+
+function getSelectedPills(containerId) {
+  return [...document.querySelectorAll(`#${containerId} .pill.sel`)].map(p => p.dataset.val);
+}
+
+function clearPills(containerId) {
+  document.querySelectorAll(`#${containerId} .pill`).forEach(p => p.classList.remove('sel'));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Dashboard Filters
+// ════════════════════════════════════════════════════════════════════════════
+function populateDashboardStudentFilter() {
+  const sel = document.getElementById('f-student');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All Students</option>' +
+    allStudents.map(s => `<option value="${esc(s.name)}" ${cur===s.name?'selected':''}>${esc(s.name)}</option>`).join('');
+}
+
+function applyFilters() {
+  const student = document.getElementById('f-student')?.value || '';
+  const startDate = document.getElementById('f-start')?.value || '';
+  const endDate   = document.getElementById('f-end')?.value || '';
+
+  filteredCases = allCases.filter(c => {
+    if (student && c.student_name !== student) return false;
+    if (startDate && c.date < startDate) return false;
+    if (endDate   && c.date > endDate)   return false;
+    return true;
+  });
+
+  renderDashboard();
+}
+
+function clearFilters() {
+  document.getElementById('f-student').value = '';
+  document.getElementById('f-start').value = '';
+  document.getElementById('f-end').value = '';
+  applyFilters();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Dashboard Render
+// ════════════════════════════════════════════════════════════════════════════
+function renderDashboard() {
+  const stats = computeOverallStats(filteredCases);
+  renderOverallStats(stats);
+  renderPreCourseStats();
+  renderStudentTable();
+  renderCasesList();
+}
+
+function computeOverallStats(cases) {
+  let maxillary=0, mandibular=0, implants=0, extractions=0, immLoad=0;
+  let ridge=0, vSinus=0, lSinus=0, aiOk=0, aiFail=0, stock=0;
+  const noLoadCounts = {}, dateMap = {};
+
+  cases.forEach(c => {
+    const procs = c.procedures || [];
+    if (procs.includes('Maxillary full arch')) maxillary++;
+    if (procs.includes('Mandibular full arch')) mandibular++;
+    if (procs.includes('Ridge augmentation')) ridge++;
+    if (procs.includes('Vertical sinus lift')) vSinus++;
+    if (procs.includes('Lateral sinus lift')) lSinus++;
+
+    implants    += c.num_implants    || 0;
+    extractions += c.num_extractions || 0;
+
+    if (c.immediate_load === 'maxillary') immLoad += 1;
+    else if (c.immediate_load === 'mandibular') immLoad += 1;
+    else if (c.immediate_load === 'both')  immLoad += 2;
+
+    (c.no_load_reasons || []).forEach(r => noLoadCounts[r] = (noLoadCounts[r]||0)+1);
+
+    const pw = c.prosthetic_workflow || [];
+    if (pw.includes('Used AI to successfully design temporary prosthesis')) aiOk++;
+    if (pw.includes('Tried AI and it did not work'))                         aiFail++;
+    if (pw.includes('Delivered stock denture'))                              stock++;
+
+    dateMap[c.date] = (dateMap[c.date]||0) + 1;
+  });
+
+  const totalArches = maxillary + mandibular;
+  const ilPct = totalArches > 0 ? ((immLoad / totalArches)*100).toFixed(1) : '—';
+  const aiPct = (aiOk+aiFail) > 0 ? ((aiOk/(aiOk+aiFail))*100).toFixed(1)+'%' : '—';
+
+  return {
+    totalCases: cases.length, totalArches, maxillary, mandibular,
+    implants, extractions, immLoad, ilPct,
+    ridge, vSinus, lSinus,
+    aiOk, aiFail, aiPct, stock,
+    noLoadCounts, dateMap,
+  };
+}
+
+function renderOverallStats(s) {
+  const cards = [
+    { val: s.totalCases,  label: 'Total Cases',           color: '#3b82f6' },
+    { val: s.totalArches, label: 'Total Arches Treated',  color: '#6366f1' },
+    { val: s.maxillary,   label: 'Maxillary Full Arches', color: '#8b5cf6' },
+    { val: s.mandibular,  label: 'Mandibular Full Arches',color: '#06b6d4' },
+    { val: s.implants,    label: 'Implants Placed',       color: '#2563eb' },
+    { val: s.extractions, label: 'Extractions',           color: '#0891b2' },
+    { val: s.immLoad,     label: 'Immediately Loaded Arches', color: '#059669' },
+    { val: s.ilPct + (s.ilPct !== '—' ? '%' : ''), label: 'Immediate Load Rate', color: '#10b981', sub: 'by arch count' },
+    { val: s.ridge,       label: 'Ridge Augmentations',  color: '#d97706' },
+    { val: s.vSinus,      label: 'Vertical Sinus Lifts', color: '#b45309' },
+    { val: s.lSinus,      label: 'Lateral Sinus Lifts',  color: '#92400e' },
+    { val: s.aiOk,        label: 'AI Prosthesis Successes', color: '#059669' },
+    { val: s.aiFail,      label: 'AI Attempts Failed',   color: '#dc2626' },
+    { val: s.aiPct,       label: 'AI Success Rate',      color: '#7c3aed' },
+    { val: s.stock,       label: 'Stock Dentures Delivered', color: '#64748b' },
+  ];
+
+  document.getElementById('overall-stats').innerHTML = cards.map(c => `
+    <div class="metric" style="--metric-color:${c.color}">
+      <div class="metric-val">${c.val}</div>
+      <div class="metric-label">${c.label}</div>
+      ${c.sub ? `<div class="metric-sub">${c.sub}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function renderPreCourseStats() {
+  const students = allStudents;
+  if (!students.length) {
+    document.getElementById('precourse-stats-block').innerHTML =
+      '<div class="empty"><div class="empty-icon">📋</div><p>No students registered yet.</p></div>';
+    return;
+  }
+
+  const totalPriorArches   = students.reduce((s,x) => s + (x.prior_arches||0), 0);
+  const totalPriorImplants = students.reduce((s,x) => s + (x.prior_implants||0), 0);
+  const avgArches   = students.length ? (totalPriorArches   / students.length).toFixed(1) : 0;
+  const avgImplants = students.length ? (totalPriorImplants / students.length).toFixed(1) : 0;
+
+  // Course totals for comparison
+  const courseArches   = filteredCases.reduce((s,c) => {
+    const p = c.procedures||[];
+    return s + (p.includes('Maxillary full arch')?1:0) + (p.includes('Mandibular full arch')?1:0);
+  }, 0);
+  const courseImplants = filteredCases.reduce((s,c) => s + (c.num_implants||0), 0);
+
+  document.getElementById('precourse-stats-block').innerHTML = `
+    <div class="pre-cmp">
+      <div class="cmp-card">
+        <div class="cmp-val" style="color:#7c3aed">${totalPriorArches}</div>
+        <div class="cmp-label">Total Prior Arches (Group)</div>
+      </div>
+      <div class="cmp-card">
+        <div class="cmp-val" style="color:#2563eb">${totalPriorImplants}</div>
+        <div class="cmp-label">Total Prior Implants (Group)</div>
+      </div>
+      <div class="cmp-card">
+        <div class="cmp-val" style="color:#7c3aed">${avgArches}</div>
+        <div class="cmp-label">Avg Prior Arches / Student</div>
+      </div>
+      <div class="cmp-card">
+        <div class="cmp-val" style="color:#2563eb">${avgImplants}</div>
+        <div class="cmp-label">Avg Prior Implants / Student</div>
+      </div>
+    </div>
+    <div class="cmp-card mt8" style="background:#f8fafc;border:1px solid var(--g200)">
+      <div style="display:flex;justify-content:space-around;flex-wrap:wrap;gap:16px;text-align:center">
+        <div>
+          <div style="font-size:11px;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Prior Arches</div>
+          <div style="font-size:24px;font-weight:800;color:#7c3aed">${totalPriorArches}</div>
+        </div>
+        <div style="font-size:22px;color:var(--g300);align-self:center">→</div>
+        <div>
+          <div style="font-size:11px;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Course Arches</div>
+          <div style="font-size:24px;font-weight:800;color:#059669">${courseArches}</div>
+        </div>
+        <div style="width:1px;background:var(--g200);display:none" class="vsep"></div>
+        <div>
+          <div style="font-size:11px;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Prior Implants</div>
+          <div style="font-size:24px;font-weight:800;color:#6366f1">${totalPriorImplants}</div>
+        </div>
+        <div style="font-size:22px;color:var(--g300);align-self:center">→</div>
+        <div>
+          <div style="font-size:11px;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Course Implants</div>
+          <div style="font-size:24px;font-weight:800;color:#059669">${courseImplants}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderStudentTable() {
+  const tbody = document.getElementById('student-table-body');
+  const summary = document.getElementById('student-needs-summary');
+
+  if (!allStudents.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--g400)">No students registered yet.</td></tr>';
+    summary.innerHTML = '';
+    return;
+  }
+
+  // Merge registered students with any names that appear only in cases
+  const caseOnlyNames = [...new Set(filteredCases.map(c => c.student_name))]
+    .filter(n => !allStudents.some(s => s.name === n))
+    .map(name => ({ id: name, name, prior_arches: 0, prior_implants: 0 }));
+  const displayStudents = [...allStudents, ...caseOnlyNames];
+
+  const rows = displayStudents.map(s => {
+    const sc = filteredCases.filter(c => c.student_name === s.name);
+    let maxArch=0, mandArch=0, implants=0, immLoad=0, ridge=0, vSinus=0, lSinus=0, aiOk=0;
+    sc.forEach(c => {
+      const p = c.procedures||[];
+      if (p.includes('Maxillary full arch')) maxArch++;
+      if (p.includes('Mandibular full arch')) mandArch++;
+      if (p.includes('Ridge augmentation')) ridge++;
+      if (p.includes('Vertical sinus lift')) vSinus++;
+      if (p.includes('Lateral sinus lift')) lSinus++;
+      implants += c.num_implants||0;
+      if (c.immediate_load==='maxillary') immLoad+=1;
+      else if (c.immediate_load==='mandibular') immLoad+=1;
+      else if (c.immediate_load==='both') immLoad+=2;
+      if ((c.prosthetic_workflow||[]).includes('Used AI to successfully design temporary prosthesis')) aiOk++;
+    });
+    return { s, cases:sc.length, maxArch, mandArch, implants, immLoad, ridge, vSinus, lSinus, aiOk };
+  }).sort((a,b)=>a.s.name.localeCompare(b.s.name));
+
+  // Summary chips
+  const needsIL  = rows.filter(r => r.cases > 0 && r.immLoad === 0).length;
+  const needsAI  = rows.filter(r => r.cases > 0 && r.aiOk === 0).length;
+  const totalActive = rows.filter(r => r.cases > 0).length;
+
+  summary.innerHTML = `
+    ${needsIL > 0
+      ? `<div class="need-chip need-chip-warn">⚡ <span class="need-chip-num">${needsIL}</span> student${needsIL!==1?'s':''} still need${needsIL===1?'s':''} to immediately load</div>`
+      : totalActive > 0 ? `<div class="need-chip need-chip-ok">⚡ All students have immediately loaded</div>` : ''}
+    ${needsAI > 0
+      ? `<div class="need-chip need-chip-warn">🤖 <span class="need-chip-num">${needsAI}</span> student${needsAI!==1?'s':''} still need${needsAI===1?'s':''} a successful AI prosthesis</div>`
+      : totalActive > 0 ? `<div class="need-chip need-chip-ok">🤖 All students have a successful AI prosthesis</div>` : ''}
+  `;
+
+  // Status badge helpers
+  const ilBadge = r => {
+    if (r.cases === 0) return `<span class="sb sb-na">No cases yet</span>`;
+    return r.immLoad > 0
+      ? `<span class="sb sb-done">✓ Done &nbsp;·&nbsp; ${r.immLoad} arch${r.immLoad!==1?'es':''}</span>`
+      : `<span class="sb sb-needed">! Needed</span>`;
+  };
+  const aiBadge = r => {
+    if (r.cases === 0) return `<span class="sb sb-na">No cases yet</span>`;
+    return r.aiOk > 0
+      ? `<span class="sb sb-done">✓ Done &nbsp;·&nbsp; ${r.aiOk}×</span>`
+      : `<span class="sb sb-needed">! Needed</span>`;
+  };
+
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td class="td-name">${esc(r.s.name)}</td>
+      <td class="td-num">${r.cases}</td>
+      <td>${ilBadge(r)}</td>
+      <td>${aiBadge(r)}</td>
+      <td class="td-num">${r.maxArch}</td>
+      <td class="td-num">${r.mandArch}</td>
+      <td class="td-num">${r.implants}</td>
+      <td class="td-num">${r.ridge}</td>
+      <td class="td-num">${r.vSinus}</td>
+      <td class="td-num">${r.lSinus}</td>
+    </tr>
+  `).join('');
+}
+
+function renderCasesList() {
+  const el = document.getElementById('cases-list');
+  const recent = filteredCases.slice(0, 20);
+  if (!recent.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📂</div><p>No cases submitted yet.</p></div>';
+    return;
+  }
+
+  el.innerHTML = recent.map(c => {
+    const procs = (c.procedures||[]).map(p=>`<span class="tag">${esc(p)}</span>`).join('');
+    const pw    = (c.prosthetic_workflow||[]).map(p=>`<span class="tag purple">${esc(p)}</span>`).join('');
+    const loadLabel = {maxillary:'Loaded — Maxillary',mandibular:'Loaded — Mandibular',both:'Loaded — Both',no:'Not loaded'}[c.immediate_load]||'';
+    const loadClass = c.immediate_load==='no'?'orange':'green';
+    return `
+      <div class="case-item">
+        <div class="case-item-header">
+          <div>
+            <div class="case-item-name">${esc(c.student_name)}</div>
+            <div class="case-item-date">${c.date}${c.case_id ? ' · '+esc(c.case_id) : ''}</div>
+          </div>
+          <button class="btn-danger-sm" onclick="deleteCase('${c.id}')">Delete</button>
+        </div>
+        <div class="case-tags">${procs}</div>
+        <div class="case-tags">
+          <span class="tag ${loadClass}">${loadLabel}</span>
+          ${pw}
+        </div>
+        <div class="case-item-footer">
+          <span>${c.num_implants||0} implants · ${c.num_extractions||0} extractions</span>
+          ${c.notes ? `<span style="font-style:italic">${esc(c.notes.slice(0,60))}${c.notes.length>60?'…':''}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function deleteCase(id) {
+  if (!confirm('Delete this case?')) return;
+  await store.deleteCase(id);
+  allCases = allCases.filter(c => c.id !== id);
+  applyFilters();
+  toast('Case deleted', 'info');
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// Toast
+// ════════════════════════════════════════════════════════════════════════════
+function toast(msg, type='success') {
+  const root = document.getElementById('toast-root');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  root.appendChild(el);
+  requestAnimationFrame(() => { requestAnimationFrame(() => el.classList.add('show')); });
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 300);
+  }, 3000);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Utils
+// ════════════════════════════════════════════════════════════════════════════
+function esc(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Init
+// ════════════════════════════════════════════════════════════════════════════
+async function init() {
+  [allStudents, allCases] = await Promise.all([store.getStudents(), store.getCases()]);
+  renderRegisteredStudents();
+  populateCaseStudentDropdown();
+}
+</script>
+</body>
+</html>
